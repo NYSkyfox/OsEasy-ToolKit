@@ -5,7 +5,7 @@ import os
 
 # 基础信息
 APP_NAME = "OsEasy-ToolBox"
-APP_VERSION = "OsEasy-ToolBox v1.8 Beta3"
+APP_VERSION = "OsEasy-ToolBox v1.8 Beta4"
 AUTHOR = "ZiHaoSaMa66"
 GITHUB_URL = "https://github.com/ZiHaoSaMa66/OsEasy-ToolBox"
 
