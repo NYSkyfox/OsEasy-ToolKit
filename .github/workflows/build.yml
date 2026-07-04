@@ -113,7 +113,6 @@ jobs:
             --exclude-module=jupyter `
             --exclude-module=notebook `
             --exclude-module=pydoc `
-            --exclude-module=unittest `
             --exclude-module=test `
             --add-data="Fake_SCR.py;." `
             --add-data="config.py;." `
