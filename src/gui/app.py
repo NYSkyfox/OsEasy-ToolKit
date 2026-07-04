@@ -495,7 +495,7 @@ class Ui:
         self.bgtmd = e.control.value
         self.reflash_ui_bg()
 
-    def yiyan_pick_files_result(self, e: ft.FilePickerResultEvent):
+    def yiyan_pick_files_result(self, e):
         try:
             _yiyanfpath = e.files[0]
             self.yiyanfpath = os.path.join(_yiyanfpath.path)
@@ -520,7 +520,7 @@ class Ui:
         if self.loaded_bg == True:
             self.reflash_ui_bg()
 
-    def font_pick_files_result(self, e: ft.FilePickerResultEvent):
+    def font_pick_files_result(self, e):
         try:
             _fontfpath = e.files[0]
             self.zdy_fontpath = os.path.join(_fontfpath.path)
@@ -528,7 +528,7 @@ class Ui:
         except TypeError:
             self.show_snakemessage("未选择字体文件")
 
-    def pick_files_result(self, e: ft.FilePickerResultEvent):
+    def pick_files_result(self, e):
         try:
             _bgpath = e.files[0]
             self.bgpath = os.path.join(_bgpath.path)
