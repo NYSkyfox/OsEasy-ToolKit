@@ -3,6 +3,21 @@
 
 import os
 import sys
+import ctypes
+
+# ── 自动提权：不是管理员则弹 UAC 提权重启 ──
+def run_as_admin():
+    """检测是否管理员身份，不是则弹 UAC 提权"""
+    try:
+        if ctypes.windll.shell32.IsUserAnAdmin() == 0:
+            ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", sys.executable, " ".join(sys.argv[1:]), None, 1
+            )
+            sys.exit(0)
+    except:
+        pass  # 提权失败则继续以当前权限运行
+
+run_as_admin()
 
 # CI 测试模式：只 import 关键依赖并初始化，不启动 GUI
 if os.environ.get("OSEASY_TEST_MODE") == "1":
