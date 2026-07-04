@@ -1,3 +1,5 @@
+import os
+
 # config.py
 # 工具箱静态配置信息
 
@@ -10,11 +12,11 @@ GITHUB_URL = "https://github.com/ZiHaoSaMa66/OsEasy-ToolBox"
 # 默认字体
 DEFAULT_FONT_PATH = "C:\\Windows\\Fonts\\Deng.ttf"
 
-# 配置文件路径
-CONFIG_FILE_PATH = "C:\\ToolBoxConfig.json"
+# 配置文件路径（%APPDATA% 目录，普通用户有写入权限）
+CONFIG_FILE_PATH = os.path.join(os.environ.get("APPDATA", "C:\\Temp"), "OsEasy-ToolBox", "ToolBoxConfig.json")
 
 # 备份文件路径
-BACKUP_PATH = "C:\\Backups"
+BACKUP_PATH = os.path.join(os.environ.get("APPDATA", "C:\\Temp"), "OsEasy-ToolBox", "Backups")
 
 # 工具箱生成的脚本文件夹路径模板
 CMD_FILE_PATH_TEMPLATE = "C:\\Users\\{username}\\prod"
