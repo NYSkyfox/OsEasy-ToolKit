@@ -2,6 +2,7 @@
 # 运行时配置读写类
 
 import json
+import os
 from config import CONFIG_FILE_PATH, DEFAULT_OSEASY_PATH, DEFAULT_STUDENT_EXE_NAME
 from src.core.helpers import check_give_file_path_is_excs, get_time_str
 
@@ -53,8 +54,14 @@ class RuntimeConfig:
 
     def _write_config_raw(self, datas: dict) -> None:
         """写入配置文件"""
-        with open(self.config_file_path, "w", encoding="utf-8") as f:
-            f.write(json.dumps(datas, ensure_ascii=False, indent=4))
+        try:
+            with open(self.config_file_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(datas, ensure_ascii=False, indent=4))
+        except (FileNotFoundError, OSError):
+            # 目录不存在，自动创建后重试
+            os.makedirs(os.path.dirname(self.config_file_path), exist_ok=True)
+            with open(self.config_file_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(datas, ensure_ascii=False, indent=4))
 
     # ---- 公开方法 ----
 

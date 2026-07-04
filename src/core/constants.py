@@ -13,6 +13,13 @@ try:
     os.makedirs(BACKUP_PATH, mode=0o777, exist_ok=True)
 except PermissionError:
     raise Exception("权限不足: 请右键使用管理员身份运行")
+except (FileNotFoundError, OSError):
+    # 若父目录不存在导致失败，确保父目录存在后重试
+    for p in (cmd_file_path, BACKUP_PATH):
+        parent = os.path.dirname(p)
+        if parent and not os.path.exists(parent):
+            os.makedirs(parent, mode=0o777, exist_ok=True)
+        os.makedirs(p, mode=0o777, exist_ok=True)
 
 # 运行时状态标志
 is_box_killer_running = False
