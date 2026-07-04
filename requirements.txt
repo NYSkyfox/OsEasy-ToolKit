@@ -1,4 +1,4 @@
-flet-desktop==0.18.0
+flet>=0.25.0
 pynput
 pyautogui
 psutil
