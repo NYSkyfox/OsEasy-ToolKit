@@ -2,10 +2,6 @@ name: Build and Release EXE
 
 on:
   workflow_dispatch:
-    inputs:
-      tag_name:
-        description: 'Tag name (e.g. v1.8.0)'
-        required: true
 
 permissions:
   contents: write
@@ -42,10 +38,24 @@ jobs:
           $appName = python -c "import config; print(config.APP_NAME)"
           $versionRaw = python -c "import config; print(config.APP_VERSION)"
           $version = $versionRaw -replace ' ', '_'
+          $tag = $version
           Write-Host "APP_NAME=$appName"
           Write-Host "APP_VERSION=$version"
+          Write-Host "TAG=$tag"
           "app_name=$appName" >> $env:GITHUB_OUTPUT
           "app_version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Check if tag exists
+        run: |
+          $tag = "${{ steps.config.outputs.tag }}"
+          git fetch --tags
+          $existing = git tag -l $tag
+          if ($existing) {
+            Write-Error "Tag $tag already exists. Bump version in config.py before building."
+            exit 1
+          }
         shell: pwsh
 
       - name: Build EXE
@@ -98,7 +108,7 @@ jobs:
       - name: Create tag and release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag_name }}
+          tag_name: ${{ steps.config.outputs.tag }}
           name: ${{ steps.config.outputs.app_version }}
           files: dist/${{ steps.exe.outputs.exe_name }}
           generate_release_notes: true
