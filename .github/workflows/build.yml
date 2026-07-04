@@ -63,6 +63,13 @@ jobs:
           }
         shell: pwsh
 
+      - name: Install UPX
+        run: |
+          curl -sL "https://github.com/upx/upx/releases/download/v5.2.0/upx-5.2.0-win64.zip" -o upx.zip
+          Expand-Archive -Path upx.zip -DestinationPath upx
+          echo "$pwd/upx/upx-5.2.0-win64" >> $env:GITHUB_PATH
+        shell: pwsh
+
       - name: Build EXE
         run: |
           pyinstaller `
@@ -81,6 +88,33 @@ jobs:
             --hidden-import=urllib.request `
             --hidden-import=urllib.parse `
             --collect-all=flet `
+            --collect-binaries=flet `
+            --hidden-import=flet `
+            --hidden-import=flet_core `
+            --hidden-import=flet_desktop `
+            --hidden-import=flet_runtime `
+            --hidden-import=pynput.keyboard._win32 `
+            --hidden-import=pynput.mouse._win32 `
+            --hidden-import=httpx `
+            --hidden-import=psutil `
+            --hidden-import=pyautogui `
+            --hidden-import=pygetwindow `
+            --exclude-module=tkinter `
+            --exclude-module=matplotlib `
+            --exclude-module=numpy `
+            --exclude-module=pandas `
+            --exclude-module=PIL `
+            --exclude-module=PyQt5 `
+            --exclude-module=PyQt6 `
+            --exclude-module=PySide2 `
+            --exclude-module=PySide6 `
+            --exclude-module=wx `
+            --exclude-module=IPython `
+            --exclude-module=jupyter `
+            --exclude-module=notebook `
+            --exclude-module=pydoc `
+            --exclude-module=unittest `
+            --exclude-module=test `
             --add-data="Fake_SCR.py;." `
             --add-data="config.py;." `
             main.py
