@@ -37,13 +37,18 @@ jobs:
         run: |
           $appName = python -c "import config; print(config.APP_NAME)"
           $versionRaw = python -c "import config; print(config.APP_VERSION)"
-          $version = $versionRaw -replace ' ', '_'
-          $tag = $version
+          # 从 APP_VERSION 中提取纯版本号，例如 "v1.8 Beta2" 或 "v1.8.0"
+          if ($versionRaw -match 'v\d+(\.\d+)*(\s+(Beta|Alpha|RC)\d*)?') {
+            $ver = $Matches[0] -replace '\s+', '_'
+          } else {
+            $ver = $versionRaw -replace '\s+', '_'
+          }
+          $tag = $ver
           Write-Host "APP_NAME=$appName"
-          Write-Host "APP_VERSION=$version"
+          Write-Host "APP_VERSION=$ver"
           Write-Host "TAG=$tag"
           "app_name=$appName" >> $env:GITHUB_OUTPUT
-          "app_version=$version" >> $env:GITHUB_OUTPUT
+          "app_version=$ver" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
