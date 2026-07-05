@@ -153,12 +153,46 @@ jobs:
           name: ${{ steps.exe.outputs.exe_name }}
           path: dist/${{ steps.exe.outputs.exe_name }}
 
+      - name: Generate release body
+        id: release_body
+        run: |
+          $body = @"
+## OsEasy-ToolBox ${{ steps.config.outputs.app_version }}
+
+### 🚀 主要变更
+- **底层框架升级**：flet-desktop 从 0.18 升级到 0.25，重构打包流程
+- **自动提权**：启动时自动检测并弹出 UAC 提权，不再需要手动右键管理员运行
+- **配置文件路径还原**：回到 C:\ToolBoxConfig.json，自动创建目录
+- **目录容错**：所有文件写入前自动创建父目录，不再因目录不存在而崩溃
+
+### 📦 构建优化
+- 锁定 flet-desktop==0.25.0，正确收集 Flutter 客户端二进制到 exe
+- 锁定 pyinstaller==6.11.1，避免新版兼容问题
+- 增加 UPX 压缩，排除无用模块以控制体积
+- GitHub Actions CI/CD 自动构建、哈希命名、发布 release
+
+### 🐛 Bug 修复
+- 修复运行时 RemoteDisconnected / HTTP 404 报错（flet client 未正确打包）
+- 修复 PermissionError 写配置文件问题（自动提权 + 自动创建目录）
+- 修复 ModuleNotFoundError: flet_desktop 问题
+- 修复 Hidden import "flet_core" not found 警告
+- 修复 flet pack 参数不兼容 0.25 问题
+
+### ⚠️ 注意
+- 首次启动会弹出 UAC 提权窗口，请点击"是"
+- 旧版配置文件位于 %%APPDATA%%，新版位于 C:\，需重新配置
+"@
+          # 写入文件，避免 GITHUB_OUTPUT 的多行处理问题
+          $body > "${{ runner.temp }}\release_body.md"
+          Get-Content "${{ runner.temp }}\release_body.md"
+        shell: pwsh
+
       - name: Create tag and release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.config.outputs.tag }}
           name: ${{ steps.config.outputs.app_version }}
+          body_path: ${{ runner.temp }}\release_body.md
           files: dist/${{ steps.exe.outputs.exe_name }}
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
