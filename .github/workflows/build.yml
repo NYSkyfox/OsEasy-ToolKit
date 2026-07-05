@@ -72,12 +72,48 @@ jobs:
 
       - name: Build EXE
         run: |
-          flet pack main.py `
-            --name OsEasyToolBox `
-            --icon logo.ico `
-            --add-data Fake_SCR.py:. `
-            --add-data config.py:. `
-            --onefile-windowed
+          pyinstaller `
+            --onefile `
+            --windowed `
+            --name=OsEasyToolBox `
+            --icon=logo.ico `
+            --upx-exclude="email*" `
+            --upx-exclude="urllib*" `
+            --upx-exclude="ssl*" `
+            --hidden-import=email `
+            --hidden-import=email.mime `
+            --hidden-import=email.mime.multipart `
+            --hidden-import=email.mime.text `
+            --hidden-import=email.mime.base `
+            --hidden-import=urllib.request `
+            --hidden-import=urllib.parse `
+            --collect-all=flet `
+            --collect-binaries=flet `
+            --hidden-import=flet `
+            --hidden-import=pynput.keyboard._win32 `
+            --hidden-import=pynput.mouse._win32 `
+            --hidden-import=httpx `
+            --hidden-import=psutil `
+            --hidden-import=pyautogui `
+            --hidden-import=pygetwindow `
+            --exclude-module=tkinter `
+            --exclude-module=matplotlib `
+            --exclude-module=numpy `
+            --exclude-module=pandas `
+            --exclude-module=PIL `
+            --exclude-module=PyQt5 `
+            --exclude-module=PyQt6 `
+            --exclude-module=PySide2 `
+            --exclude-module=PySide6 `
+            --exclude-module=wx `
+            --exclude-module=IPython `
+            --exclude-module=jupyter `
+            --exclude-module=notebook `
+            --exclude-module=pydoc `
+            --exclude-module=test `
+            --add-data="Fake_SCR.py;." `
+            --add-data="config.py;." `
+            main.py
         shell: pwsh
 
       - name: Post-build smoke test
