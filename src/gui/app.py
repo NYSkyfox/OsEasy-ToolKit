@@ -319,6 +319,10 @@ class Ui:
             self.accent_color = DEFAULT_ACCENT_COLOR
         # 刷新当前页面重建控件
         self.selPages_Helper(int(self.NowSelIndex))
+        # main() 中创建的控件不会随页面重建，需单独更新颜色
+        self.hide_tbox_swc.active_color = self.accent_color
+        self.FastGetSC.active_color = self.accent_color
+        self.page.update()
 
     def toggle_random_yiyan(self, e=None):
         if e:
