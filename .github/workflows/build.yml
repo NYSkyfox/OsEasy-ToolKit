@@ -32,11 +32,6 @@ jobs:
           python main.py
         shell: pwsh
 
-      - name: Pre-cache flet desktop client
-        run: |
-          python -c "from flet_desktop import find_or_download_flet_view; find_or_download_flet_view()"
-        shell: pwsh
-
       - name: Read config values
         id: config
         run: |
@@ -93,15 +88,10 @@ jobs:
             --hidden-import=urllib.request `
             --hidden-import=urllib.parse `
             --collect-all=flet `
-            --collect-all=flet_desktop `
             --collect-binaries=flet `
-            --collect-binaries=flet_desktop `
             --hidden-import=flet `
             --hidden-import=flet_core `
-            --hidden-import=flet_desktop `
             --hidden-import=flet_runtime `
-            --hidden-import=flet_desktop.client `
-            --hidden-import=flet_desktop.server `
             --hidden-import=pynput.keyboard._win32 `
             --hidden-import=pynput.mouse._win32 `
             --hidden-import=httpx `
