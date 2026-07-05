@@ -65,6 +65,7 @@ class PageAppearance:
         ui.bgtmdb = ft.Slider(
             min=0.0, max=1.0, divisions=0.1, value=ui.bgtmd,
             on_change_end=ui.change_bg_btmd, disabled=not ui.loaded_bg,
+            active_color=ui.accent_color,
         )
 
         return ft.Column(controls=[
