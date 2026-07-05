@@ -5,7 +5,7 @@
 APP_NAME = "OsEasy-ToolBox"
 APP_VERSION = "OsEasy-ToolBox v1.8 Beta4"
 AUTHOR = "ZiHaoSaMa66"
-GITHUB_URL = "https://github.com/ZiHaoSaMa66/OsEasy-ToolBox"
+GITHUB_URL = "https://github.com/NYSkyfox/OsEasy-ToolKit"
 
 # 默认字体
 DEFAULT_FONT_PATH = "C:\\Windows\\Fonts\\Deng.ttf"
@@ -47,6 +47,7 @@ DEFAULT_SHOW_YIYAN = "希君生羽翼，一化北溟鱼"
 DEFAULT_ACCENT_COLOR = "#2E7D32"  # 墨绿
 
 # 各控件的颜色键名（存入 ToolBoxConfig.json）
+# 注：目前通过 Ui.accent_color 统一控制所有开关颜色，此映射表为未来独立颜色配置预留
 SWITCH_COLOR_KEYS = {
     "亮色主题":        "color_theme_switch",
     "外部cmd守护进程":   "color_protect_switch",

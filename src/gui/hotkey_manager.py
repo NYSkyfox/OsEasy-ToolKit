@@ -94,7 +94,7 @@ class hotkey_manager:
                 on_press=self._on_press,
                 on_release=self._on_release
             )
-            self.listener.run()
+            self.listener.start()
 
     def stop(self):
         """停止监听"""

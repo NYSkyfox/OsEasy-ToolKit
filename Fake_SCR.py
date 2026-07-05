@@ -1,31 +1,25 @@
+import os
 import sys
 # 假ScreenRender.exe
 
-MLsavepath = "C:\\Users\\Administrator\\prod\\SCCMD.txt"
+# 保存路径：优先从命令行参数读取，否则使用环境变量，最后回退默认
+MLsavepath = ""
+for arg in sys.argv:
+    if arg.startswith("--savepath="):
+        MLsavepath = arg.split("=", 1)[1]
+        break
+if not MLsavepath:
+    MLsavepath = os.environ.get("OSEASY_SCR_SAVEPATH") or os.path.join(os.getcwd(), "SCCMD.txt")
 
-# if len(sys.argv) >=4:
-#     print("? ERR > len(sys.argv) >=4:")
-#     sys.exit(1)
-
-# get = sys.argv[1]
 emp = []
 for i in sys.argv:
-    # print("debug > ",i)
-    emp.append(i)
+    emp.append(str(i))
 
-# print("emp > ",emp)
-# "C:\Program Files (x86)\Os-Easy\os-easy multicast teaching system\ScreenRender.exe" {#decoderName#:#h264#,#fullscreen#:0,#local#:#172.18.36.132#,#port#:7778,#remote#:#229.1.36.200#,#teacher_ip#:0,#verityPort#:7788}
-# get = str(get)
+for data in emp:
+    repcmd = data.replace("#fullscreen#:1", "#fullscreen#:0").replace(" ", "")
 
-
-for data_ in emp:
-    data = str(data_)
-    repcmd = data.replace("#fullscreen#:1","#fullscreen#:0").replace(" ","")
-
-
-fm = open(MLsavepath,"w")
+fm = open(MLsavepath, "w")
 fm.write(str(repcmd))
 fm.close()
-# print(f"\n\nGET_CMD >>>{repcmd}\n\n")
 print("拦截命令成功 你可以暴力脱离控制")
 print("并使用广播管理页的功能了")

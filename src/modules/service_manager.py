@@ -1,6 +1,7 @@
 # src/modules/service_manager.py
 # 服务管理与版本检测
 
+import os
 import time
 
 import psutil
@@ -34,8 +35,6 @@ def try_guess_student_client_version() -> int:
     toolbox_cfg.running_student_client_ver = 0
     return toolbox_cfg.running_student_client_ver
 
-    pass
-
 
 def if_is_high_ver_client_auto_close_mmpc_helper():
     """检查学生端版本来决定
@@ -49,8 +48,6 @@ def if_is_high_ver_client_auto_close_mmpc_helper():
         if mpStatus:
             run_sigle_cmd("sc stop MMPC")
             time.sleep(1)
-
-    pass
 
 
 def if_is_high_ver_client_then_return_stop_cmd_line(IsStop = True):

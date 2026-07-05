@@ -52,6 +52,9 @@ class Ui:
 
     def direct_run_fullscreen_boradcast_cmd(self):
         status = from_log_file_get_remote_cmd()
+        if getattr(self, 'KillSCR_swc', None) is None:
+            self.show_snakemessage("请先打开广播管理页再使用此功能")
+            return
         if self.KillSCR_swc.value:
             if status is None:
                 self.show_snakemessage("未拦截到控制命令参数")
@@ -152,7 +155,7 @@ class Ui:
             on_change=lambda _: self.hotkeyManager.switch_reg_helper(
                 self.hide_tbox_swc.value,
                 [keyboard.Key.caps_lock, keyboard.Key.enter],
-                ToolBox.hide_toolbox_helper,
+                self.hide_toolbox_helper,
             ),
             value=True,
             active_color=self.accent_color,
@@ -205,7 +208,7 @@ class Ui:
         self.hotkeyManager.switch_reg_helper(
             self.hide_tbox_swc.value,
             [keyboard.Key.caps_lock, keyboard.Key.enter],
-            ToolBox.hide_toolbox_helper,
+            self.hide_toolbox_helper,
         )
 
     # ============================================================

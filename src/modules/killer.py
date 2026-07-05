@@ -2,6 +2,7 @@
 # 击杀脚本、粘滞键绑定、守护进程
 
 import os
+import threading
 import time
 
 import pygetwindow as gw
@@ -47,8 +48,8 @@ def check_killer_script_is_alreay_start() -> None:
 
 
 def start_killer_protect() -> None:
-    global is_protect_killer_script_running
     """启动守护进程"""
+    global is_protect_killer_script_running
     ptct = 0
     while is_protect_killer_script_running == True:
         try:
@@ -72,7 +73,7 @@ def killer_script_protect() -> None:
     if is_protect_killer_script_running == False:
         is_protect_killer_script_running = True
         script_gen.summon_killer()
-        start_killer_protect()
+        threading.Thread(target=start_killer_protect, daemon=True).start()
     elif is_protect_killer_script_running == True:
         is_protect_killer_script_running = False
         use_bat_file_to_run_cmd(

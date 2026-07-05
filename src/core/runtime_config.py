@@ -112,7 +112,7 @@ class RuntimeConfig:
 
     def get_style_path(self, style_name: str) -> str | None:
         """获取自定义外观的路径
-        style_name: ["yiyan","font","bg"]
+        style_name: ["yiyanPath","fontPath","bgPath"]
         一言, 字体, 背景
         """
         return self._cache_get().get(style_name)
