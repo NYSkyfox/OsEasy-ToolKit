@@ -7,7 +7,6 @@ import flet as ft
 from pynput import keyboard
 
 from src.core.helpers import run_sigle_cmd
-from src.core.runtime_config import toolbox_cfg
 from src.modules.broadcast_handler import (
     replace_screen_render, restone_screen_render,
     check_replace_screen_render_status,
@@ -63,7 +62,7 @@ class PageBroadcast:
             label="Alt+K 杀屏幕广播进程",
             on_change=lambda _: ui.hotkeyManager.switch_reg_helper(
                 ui.KillSCR_swc.value, [keyboard.Key.alt_l, 'k'],
-                ToolBox.direct_kill_screen_render,
+                ui.direct_kill_screen_render,
             ),
             active_color=ui.accent_color,
         )
@@ -72,7 +71,7 @@ class PageBroadcast:
             on_change=lambda _: ui.hotkeyManager.switch_reg_helper(
                 ui.RunFullSC_swc.value,
                 [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
-                ToolBox.direct_run_fullscreen_boradcast_cmd,
+                ui.direct_run_fullscreen_boradcast_cmd,
             ),
             active_color=ui.accent_color,
         )
@@ -128,7 +127,3 @@ class PageBroadcast:
             ui.show_snakemessage("未检测到ScreenRender_Y.exe\n也许未执行替换或替换过程被打断")
             ui.replace_status.value = "未替换"
         ui.page.update()
-
-
-# 延迟导入避免循环
-from src.gui.app import ToolBox
