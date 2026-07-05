@@ -13,7 +13,8 @@ from config import APP_VERSION, DEFAULT_FONT_PATH, DEFAULT_YIYAN_LIST, DEFAULT_S
 from src.core.runtime_config import toolbox_cfg
 from src.core.helpers import pass_ui_class, run_sigle_cmd
 from src.modules.service_manager import try_guess_student_client_version
-from src.modules.process_manager import utils
+from src.modules.process_manager import utils, get_scshot
+
 from src.modules.broadcast_handler import (
     from_log_file_get_remote_cmd, build_run_broadcast_cmd,
 )
@@ -155,6 +156,14 @@ class Ui:
             ),
             value=True,
             active_color=self.accent_color,
+        )
+
+        self.FastGetSC = ft.Switch(
+            label="Alt+X 快捷键屏幕截图",
+            active_color=self.accent_color,
+            on_change=lambda _: self.hotkeyManager.switch_reg_helper(
+                self.FastGetSC.value, [keyboard.Key.alt_l, 'x'], get_scshot
+            ),
         )
 
         # ---- 页面实例 ----

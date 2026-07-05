@@ -2,15 +2,12 @@
 # 进程管理页（页面 0）
 
 import flet as ft
-from pynput import keyboard
 
-from src.core.runtime_config import toolbox_cfg
 from src.core.helpers import run_sigle_cmd
 from src.modules.killer import (
     register_killer_script, del_register_killer, killer_script_protect,
     start_oseasy_self_toolbox,
 )
-from src.modules.process_manager import get_scshot
 from src.modules.service_manager import check_mmpc_status, handle_start_student_client
 
 
@@ -32,14 +29,6 @@ class PageProcess:
             icon=ft.icons.BACK_HAND_OUTLINED,
             on_long_press=lambda _: run_sigle_cmd("sc stop MMPC") if check_mmpc_status() else run_sigle_cmd("sc start MMPC"),
             on_hover=self.only_update_MMPC_status,
-        )
-
-        ui.FastGetSC = ft.Switch(
-            label="Alt+X 快捷键屏幕截图",
-            active_color=ui.accent_color,
-            on_change=lambda _: ui.hotkeyManager.switch_reg_helper(
-                ui.FastGetSC.value, [keyboard.Key.alt_l, 'x'], get_scshot
-            ),
         )
 
         ui.guaqi_sw = ft.Switch(
