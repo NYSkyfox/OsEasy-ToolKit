@@ -3,15 +3,17 @@
 
 import json
 import os
-from config import CONFIG_FILE_PATH, DEFAULT_OSEASY_PATH, DEFAULT_STUDENT_EXE_NAME
+from config import CONFIG_FILE_PATH_TEMPLATE, DEFAULT_OSEASY_PATH, DEFAULT_STUDENT_EXE_NAME
 from src.core.helpers import check_give_file_path_is_excs, get_time_str
+
+_username = os.environ.get('USERNAME') or 'Default'
 
 
 class RuntimeConfig:
     """运行时配置读写类"""
 
     def __init__(self):
-        self.config_file_path = CONFIG_FILE_PATH
+        self.config_file_path = CONFIG_FILE_PATH_TEMPLATE.format(username=_username)
         self.running_student_client_ver = 0
         self.oseasypath_have_been_modified = False
         self.student_exe_name = DEFAULT_STUDENT_EXE_NAME

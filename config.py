@@ -10,14 +10,17 @@ GITHUB_URL = "https://github.com/ZiHaoSaMa66/OsEasy-ToolBox"
 # 默认字体
 DEFAULT_FONT_PATH = "C:\\Windows\\Fonts\\Deng.ttf"
 
-# 配置文件路径（C盘根目录，提权后可写入）
-CONFIG_FILE_PATH = "C:\\ToolBoxConfig.json"
+# 工具箱数据根目录（用户文件夹下）
+DATA_ROOT_TEMPLATE = "C:\\Users\\{username}\\OsEasy-ToolBox"
+
+# 配置文件路径
+CONFIG_FILE_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\ToolBoxConfig.json"
 
 # 备份文件路径
-BACKUP_PATH = "C:\\Backups"
+BACKUP_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\Backups"
 
-# 工具箱生成的脚本文件夹路径模板
-CMD_FILE_PATH_TEMPLATE = "C:\\Users\\{username}\\prod"
+# 生成的脚本文件夹路径
+CMD_FILE_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\Scripts"
 
 # 默认学生端路径
 DEFAULT_OSEASY_PATH = "C:\\Program Files (x86)\\Os-Easy\\os-easy multicast teaching system\\"
@@ -35,3 +38,23 @@ DEFAULT_YIYAN_LIST = [
     "代码没写完,Bug先写好了",
     "科技改变课堂"
 ]
+
+# 默认显示的一言
+DEFAULT_SHOW_YIYAN = "希君生羽翼，一化北溟鱼"
+
+# ---- UI 主题色 ----
+# 默认主题色（墨绿色），会在启动时尝试读取 Windows 系统主题色覆盖
+DEFAULT_ACCENT_COLOR = "#2E7D32"  # 墨绿
+
+# 各控件的颜色键名（存入 ToolBoxConfig.json）
+SWITCH_COLOR_KEYS = {
+    "亮色主题":        "color_theme_switch",
+    "外部cmd守护进程":   "color_protect_switch",
+    "挂起学生端":       "color_guaqi_switch",
+    "Alt+X 截图":      "color_screenshot_switch",
+    "Ctrl+Alt+F 全屏": "color_fullscreen_switch",
+    "Alt+K 杀广播":    "color_kill_switch",
+    "Alt+U 窗口广播":  "color_window_switch",
+    "CapsLock+Enter":  "color_hide_switch",
+    "随机一言":         "color_random_switch",
+}
