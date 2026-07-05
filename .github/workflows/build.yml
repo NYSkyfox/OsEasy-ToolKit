@@ -90,8 +90,6 @@ jobs:
             --collect-all=flet `
             --collect-binaries=flet `
             --hidden-import=flet `
-            --hidden-import=flet_core `
-            --hidden-import=flet_runtime `
             --hidden-import=pynput.keyboard._win32 `
             --hidden-import=pynput.mouse._win32 `
             --hidden-import=httpx `
