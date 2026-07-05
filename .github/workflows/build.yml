@@ -115,6 +115,15 @@ jobs:
             --exclude-module=notebook `
             --exclude-module=pydoc `
             --exclude-module=test `
+            --exclude-module=distutils `
+            --exclude-module=setuptools `
+            --exclude-module=pkg_resources `
+            --exclude-module=html `
+            --exclude-module=xmlrpc `
+            --exclude-module=http.server `
+            --exclude-module=socketserver `
+            --exclude-module=wsgiref `
+            --exclude-module=pdb `
             --add-data="Fake_SCR.py;." `
             --add-data="config.py;." `
             main.py
