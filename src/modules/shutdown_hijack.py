@@ -24,7 +24,7 @@ def _ensure_fake_shutdown_bat():
     """生成假体 bat：什么都不做，直接退出"""
     path = _get_fake_shutdown_path()
     # 内容：静默退出，code 0 表示"成功"让远程端以为命令已执行
-    content = "@echo off\r\nexit /b 0\r\n"
+    content = "@echo off\r\necho 已为您拦截教师端的远程重启\r\ntimeout /t 5 /nobreak >nul\r\nexit /b 0\r\n"
     with open(path, "w") as f:
         f.write(content)
     return path
