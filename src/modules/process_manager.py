@@ -72,14 +72,16 @@ def get_proc_pid(name) -> int | None:
 
 
 def get_scshot() -> None:
-    """保存一张屏幕截图"""
-    savepath = os.getcwd()
+    """保存一张屏幕截图到用户数据目录的 Screenshots/"""
+    from src.core.constants import cmd_file_path
+    savepath = os.path.join(cmd_file_path, "..", "Screenshots")
+    os.makedirs(savepath, exist_ok=True)
 
     PMsize = pyautogui.size()
     print("DEBUG 屏幕尺寸 > ", PMsize)
 
     img = pyautogui.screenshot()
 
-    mix_name = savepath + "\\" + get_time_str() + ".jpg"
+    mix_name = os.path.join(savepath, get_time_str() + ".jpg")
     img.save(mix_name)
     print("DEBUG SavePath > ", mix_name)
