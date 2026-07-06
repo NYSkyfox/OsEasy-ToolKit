@@ -24,9 +24,9 @@ from src.gui.pages import (
     PageProcess, PageOther, PageBroadcast, PageCommands,
     PageDll, PageAppearance, PageAbout,
 )
-from src.utils.win_utils import get_windows_accent_color
+from src.utils.win_utils import get_windows_accent_color, get_windows_default_font
 
-fontpath = DEFAULT_FONT_PATH
+fontpath = get_windows_default_font()
 
 
 class Ui:
