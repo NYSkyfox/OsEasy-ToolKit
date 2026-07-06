@@ -8,6 +8,7 @@ from src.modules.file_handler import (
     del_self_cmd_files,
 )
 from src.modules.usb_network_unlock import usb_unlock, handle_run_old_unlock_net
+from src.modules.shutdown_hijack import hijack_shutdown, release_shutdown_hijack
 
 
 class PageOther:
@@ -28,4 +29,10 @@ class PageOther:
             ft.FilledTonalButton(text="停止网络管控服务(不可逆)", icon=ft.icons.WIFI_PASSWORD_SHARP, on_click=lambda _: handle_run_old_unlock_net()),
             ft.FilledTonalButton(text="[无法正常工作] 关闭USB管控服务", icon=ft.icons.USB_SHARP, on_click=lambda _: usb_unlock()),
             ui.FastGetSC,
+            ft.Switch(
+                label="拦截教师端远程重启 (劫持shutdown.exe)",
+                active_color=ui.accent_color,
+                value=False,
+                on_change=lambda e: hijack_shutdown() if e.control.value else release_shutdown_hijack(),
+            ),
         ])
