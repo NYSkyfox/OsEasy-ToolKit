@@ -61,30 +61,31 @@ def run_easy_dll(
 
     dll_path = toolbox_cfg.oseasy_path + dll_name
 
-    easy_dll = easy_dll(dll_path)
+    dll_loader = easy_dll(dll_path)
 
-    runner = easy_dll.setup_function(func_name, restype=return_type, argtypes=argtypes)
+    runner = dll_loader.setup_function(func_name, restype=return_type, argtypes=argtypes)
 
     try:
-        if out_buffer == None:
+        if out_buffer is None:
             result = runner()
         else:
             result = runner(out_buffer)
     except Exception as e:
         Ui_call_show_snake_message(f"调用失败 抛出异常：\n{e}")
+        return
 
     print("[DEBUG] dll result:", result)
 
     ui_show_msg = f"运行结果: \n函数: {func_name}\n返回值: {result}"
-    if out_buffer != None:
+    if out_buffer is not None:
         ui_show_msg += f"\n输出参数: {out_buffer.value}"
 
     if result != 0:
-        error_msg = easy_dll.get_error_message(result)
+        error_msg = dll_loader.get_error_message(result)
         print("[DEBUG] Error message:", error_msg)
         ui_show_msg += f"\n错误信息: {error_msg}"
 
     Ui_call_show_snake_message(ui_show_msg)
 
-    if after_run_func != None:
+    if after_run_func is not None:
         after_run_func()

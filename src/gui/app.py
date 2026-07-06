@@ -8,7 +8,7 @@ import random
 import flet as ft
 from pynput import keyboard
 
-from config import APP_VERSION, DEFAULT_FONT_PATH, DEFAULT_YIYAN_LIST, DEFAULT_SHOW_YIYAN, DEFAULT_ACCENT_COLOR
+from config import APP_VERSION, DEFAULT_YIYAN_LIST, DEFAULT_SHOW_YIYAN, DEFAULT_ACCENT_COLOR
 
 from src.core.runtime_config import toolbox_cfg
 from src.core.helpers import pass_ui_class, run_sigle_cmd

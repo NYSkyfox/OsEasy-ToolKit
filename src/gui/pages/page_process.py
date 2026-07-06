@@ -44,7 +44,7 @@ class PageProcess:
             ft.FilledTonalButton(text="重新获取学生端路径", icon=ft.icons.REFRESH, on_click=ui.reflashStudentPath),
             ft.FilledTonalButton(text="注册粘滞键替换", icon=ft.icons.FILE_COPY_ROUNDED, on_click=lambda _: register_killer_script()),
             ft.FilledTonalButton(text="还原粘滞键", icon=ft.icons.FILE_COPY_ROUNDED, on_click=lambda _: del_register_killer()),
-            ft.Switch(label="外部cmd守护进程", active_color=ui.accent_color, on_change=lambda _: killer_script_protect()),
+            ui.protect_swc = ft.Switch(label="外部cmd守护进程", active_color=ui.accent_color, on_change=lambda _: killer_script_protect()),
             ui.guaqi_sw,
             ft.FilledTonalButton(text="打开噢易自带工具", icon=ft.icons.OPEN_IN_NEW, on_click=start_oseasy_self_toolbox),
         ])

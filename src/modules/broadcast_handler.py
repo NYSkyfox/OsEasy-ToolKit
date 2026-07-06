@@ -117,8 +117,11 @@ def save_scr_log_cmd_to_file(log_list=None) -> None:
 
     if log_list == []:
         return
-    elif log_list == None:
-        return save_scr_log_cmd_to_file(parse_screenrender_log())
+    elif log_list is None:
+        status, log_list = parse_screenrender_log()
+        if not status:
+            return
+        return save_scr_log_cmd_to_file(log_list)
 
     path = os.getcwd() + "\\" + "scr_log_cmd.txt"
     with open(path, "w") as f:
@@ -197,7 +200,7 @@ def try_get_teacher_ip() -> str | None:
     """尝试从广播命令中提取教师机IP"""
     bdcmd = toolbox_cfg.get_config_key_data("broadcast_cmd")
 
-    if bdcmd == "":
+    if not bdcmd:
         return None
 
     # 匹配被 # 包裹的IPv4地址
