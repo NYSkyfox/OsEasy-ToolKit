@@ -72,7 +72,7 @@ def get_proc_pid(name) -> int | None:
 
 
 def get_scshot() -> None:
-    """保存一张屏幕截图到用户数据目录的 Screenshots/"""
+    """保存一张屏幕截图到用户数据目录的 Screenshots/，并复制到剪贴板"""
     from src.core.constants import cmd_file_path
     savepath = os.path.join(cmd_file_path, "..", "Screenshots")
     os.makedirs(savepath, exist_ok=True)
@@ -85,3 +85,20 @@ def get_scshot() -> None:
     mix_name = os.path.join(savepath, get_time_str() + ".jpg")
     img.save(mix_name)
     print("DEBUG SavePath > ", mix_name)
+
+    # 复制到剪贴板
+    try:
+        import io
+        import win32clipboard
+        from PIL import Image
+        output = io.BytesIO()
+        img.convert("RGB").save(output, format="BMP")
+        data = output.getvalue()[14:]  # 去掉 BMP 文件头(14字节)
+        output.close()
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
+        win32clipboard.CloseClipboard()
+        print("DEBUG 截图已复制到剪贴板")
+    except Exception as e:
+        print(f"DEBUG 复制到剪贴板失败: {e}")

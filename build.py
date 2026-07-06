@@ -158,7 +158,7 @@ def build_args():
     extra_hidden = [
         "flet_core", "flet_desktop", "flet_runtime",
         "pynput.keyboard._win32", "pynput.mouse._win32",
-        "httpx", "ctypes.wintypes", "pygetwindow", "psutil", "pyautogui", "webbrowser",
+        "httpx", "ctypes.wintypes", "pygetwindow", "psutil", "pyautogui", "webbrowser", "win32clipboard",
     ]
     for m in extra_hidden:
         args.extend(["--hidden-import", m])
