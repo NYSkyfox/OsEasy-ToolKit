@@ -25,21 +25,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install Pillow  # 添加这个，有时需要
 
       - name: Pre-build smoke test
         run: |
           $env:OSEASY_TEST_MODE = "1"
           python main.py
         shell: pwsh
-        continue-on-error: true  # 如果测试失败，继续构建
+        continue-on-error: true
 
       - name: Read config values
         id: config
         run: |
           $appName = python -c "import config; print(config.APP_NAME)"
           $versionRaw = python -c "import config; print(config.APP_VERSION)"
-          # 从 APP_VERSION 中提取纯版本号
           if ($versionRaw -match 'v\d+(\.\d+)*(\s+(Beta|Alpha|RC)\d*)?') {
             $ver = $Matches[0] -replace '\s+', '_'
           } else {
@@ -94,6 +92,7 @@ jobs:
             --hidden-import=doctest `
             --hidden-import=inspect `
             --hidden-import=traceback `
+            --hidden-import=pyrect `
             --collect-all=flet `
             --collect-all=flet_desktop `
             --collect-data=flet `
@@ -106,8 +105,7 @@ jobs:
             --hidden-import=psutil `
             --hidden-import=pyautogui `
             --hidden-import=pygetwindow `
-            --hidden-import=pyrect `
-            --add-data="logo.ico;." `
+            --hidden-import=win32clipboard `
             --add-data="Fake_SCR.py;." `
             --add-data="config.py;." `
             --exclude-module=tkinter `
@@ -147,7 +145,7 @@ jobs:
             exit 1
           }
         shell: pwsh
-        continue-on-error: true  # 测试可能因为GUI问题失败，但构建成功了
+        continue-on-error: true
 
       - name: Compute file hash and rename EXE
         id: exe

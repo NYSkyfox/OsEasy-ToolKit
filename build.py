@@ -123,6 +123,7 @@ def build_args():
     args.extend(["--upx-exclude", "email*"])
     args.extend(["--upx-exclude", "urllib*"])
     args.extend(["--upx-exclude", "ssl*"])
+    args.extend(["--upx-exclude", "pdb*"])
 
     # 显式导入 email / urllib 全族
     email_mods = [
@@ -159,6 +160,7 @@ def build_args():
         "flet_core", "flet_desktop", "flet_runtime",
         "pynput.keyboard._win32", "pynput.mouse._win32",
         "httpx", "ctypes.wintypes", "pygetwindow", "psutil", "pyautogui", "webbrowser", "win32clipboard",
+        "pyrect", "pdb", "doctest", "inspect", "traceback",
     ]
     for m in extra_hidden:
         args.extend(["--hidden-import", m])
