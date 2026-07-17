@@ -117,6 +117,7 @@ def build_args():
         "--onefile",
         "--windowed",
         f"--name={APP_NAME}",
+        "--manifest", "app.manifest",
     ]
 
     # UPX 不压缩这些模块（避免运行时解压失败）
@@ -135,8 +136,14 @@ def build_args():
     args.extend(["--hidden-import", "urllib.request"])
     args.extend(["--hidden-import", "urllib.parse"])
 
-    # 收集 flet 全部资源
-    args.extend(["--collect-all", "flet"])
+    # 路径分隔符（Windows 用 ; ）
+    flet_datasep = ";" if os.name == "nt" else ":"
+
+    # 收集 flet 资源（--add-data 精确收集，比 --collect-all 小约3~6MB）
+    args.extend(["--add-data", f"venv{os.sep}Lib{os.sep}site-packages{os.sep}flet{flet_datasep}flet"])
+    args.extend(["--add-data", f"venv{os.sep}Lib{os.sep}site-packages{os.sep}flet_desktop{flet_datasep}flet_desktop"])
+    args.extend(["--hidden-import", "flet"])
+    args.extend(["--hidden-import", "flet_desktop"])
 
     if ICON_PATH and Path(ICON_PATH).exists():
         args.extend(["--icon", ICON_PATH])

@@ -41,25 +41,27 @@ class PageAppearance:
         ui.random_yiyan_swc = ft.Switch(
             label="随机一言",
             on_change=ui.toggle_random_yiyan,
-            value=False,
-            active_color=ui.accent_color,
+            value=ui.random_yy_enabled,
         )
         ui.remove_rem = ft.ElevatedButton(
             "清除历史路径记忆",
             icon=ft.icons.DELETE_OUTLINE,
             on_click=del_historyrem,
         )
-        ui.ztqhb = ft.Switch(
-            label="亮色主题",
-            on_change=ui.theme_changed,
-            value=True,
-            active_color=ui.accent_color,
+        ui.theme_dropdown = ft.Dropdown(
+            label="主题模式",
+            value=ui.theme_mode_key,
+            on_change=ui.set_theme_mode,
+            options=[
+                ft.dropdown.Option("system", "跟随系统"),
+                ft.dropdown.Option("light", "浅色模式"),
+                ft.dropdown.Option("dark", "深色模式"),
+            ],
         )
         ui.system_accent_swc = ft.Switch(
             label="系统主题颜色",
             on_change=ui.toggle_system_accent,
             value=ui.follow_system_accent,
-            active_color=ui.accent_color,
         )
         ui.bgtmd_text = ft.Text("滑动以调整背景图片不透明度")
         ui.bgtmdb = ft.Slider(
@@ -70,6 +72,6 @@ class PageAppearance:
 
         return ft.Column(controls=[
             ui.yiyanshowtext, ft.Divider(height=1),
-            ui.ztqhb, ui.system_accent_swc, ui.random_yiyan_swc, ui.remove_rem, ui.zitibtn,
+            ui.theme_dropdown, ui.system_accent_swc, ui.random_yiyan_swc, ui.remove_rem, ui.zitibtn,
             ui.bgfilepick, ui.bgtmd_text, ui.bgtmdb, ui.yiyanbtn,
         ])

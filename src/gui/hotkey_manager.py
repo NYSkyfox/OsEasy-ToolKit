@@ -22,8 +22,9 @@ class hotkey_manager:
         """
         print(f"register {keys =}")
         normalized = frozenset(self._normalize_key(k) for k in keys)
-        self.hotkeys[normalized].append(callback)
-
+        callbacks = self.hotkeys[normalized]
+        if callback not in callbacks:
+            callbacks.append(callback)
         self.start()
 
     def unregister_hotkey(self, keys, callback):

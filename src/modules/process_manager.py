@@ -56,6 +56,17 @@ class utils:
         """恢复挂起进程"""
         return utils.suspend_resume_process(process_name, "resume")
 
+    @staticmethod
+    def is_process_suspended(process_name) -> bool:
+        """检测指定进程是否处于挂起状态"""
+        try:
+            for process in psutil.process_iter(["pid", "name", "status"]):
+                if process.info["name"] == process_name:
+                    return process.info["status"] == psutil.STATUS_STOPPED
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+        return False
+
 
 def get_proc_pid(name) -> int | None:
     """
