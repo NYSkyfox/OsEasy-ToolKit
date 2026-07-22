@@ -40,6 +40,7 @@ class Ui:
         self.random_yy_enabled = False
         self.follow_system_accent = True  # 默认跟随系统主题色
         self.accent_color = get_windows_accent_color()
+        self.theme_mode_key = "system"   # 主题模式: system / light / dark
         self.font_loadtime = 1
         self.NowSelIndex = "0"
         self.yiyanshowtext = ft.Text("", size=16)
