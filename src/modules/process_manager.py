@@ -94,7 +94,7 @@ def get_scshot() -> None:
     img = pyautogui.screenshot()
 
     mix_name = os.path.join(savepath, get_time_str() + ".jpg")
-    img.save(mix_name)
+    img.save(mix_name, quality=95, optimize=True)
     print("DEBUG SavePath > ", mix_name)
 
     # 复制到剪贴板
