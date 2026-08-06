@@ -65,11 +65,25 @@ class PageProcess:
                 icon=ft.icons.FOLDER_OPEN,
                 on_click=self.open_oseasy_dir,
             ),
+            ft.FilledTonalButton(
+                text="打开ToolKit数据文件夹",
+                icon=ft.icons.FOLDER_SPECIAL,
+                on_click=self.open_toolkit_data_dir,
+            ),
         ])
 
     def open_oseasy_dir(self, *e):
         """在资源管理器中打开 OsEasy 安装目录"""
         path = toolkit_cfg.oseasy_path
+        if os.path.exists(path):
+            os.startfile(path)
+        else:
+            self.ui.show_snakemessage(f"目录不存在: {path}")
+
+    def open_toolkit_data_dir(self, *e):
+        """在资源管理器中打开 ToolKit 数据文件夹"""
+        from config import DATA_ROOT_TEMPLATE
+        path = DATA_ROOT_TEMPLATE.format(username=os.environ.get('USERNAME', 'Default'))
         if os.path.exists(path):
             os.startfile(path)
         else:
