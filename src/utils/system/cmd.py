@@ -6,13 +6,12 @@ import os
 from src.core.constants import cmd_file_path
 
 
-def run_sigle_cmd(givecmd: str, *quiterun: bool) -> None:
-    """运行指定的命令"""
-    if not quiterun:
-        os.popen(cmd=givecmd)
-    elif quiterun == False:
-        os.system(command=givecmd)
-    elif quiterun == True:
+def run_sigle_cmd(givecmd: str, quiet: bool = False) -> None:
+    """运行指定的命令
+    :param givecmd: 要执行的命令
+    :param quiet: True=不弹窗口(asynchronous), False=等待完成(synchronous)
+    """
+    if quiet:
         os.popen(cmd=givecmd)
     else:
         os.system(command=givecmd)

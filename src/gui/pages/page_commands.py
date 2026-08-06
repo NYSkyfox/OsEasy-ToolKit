@@ -53,7 +53,7 @@ class PageCommands:
     def dev_read_lj_cmd_loj(self, *e):
         ui = self.ui
         status = save_now_broadcast_cmd()
-        if status is None:
+        if not status:
             ui.show_snakemessage("未拦截到控制命令参数")
         else:
             ui.show_snakemessage("保存拦截命令成功")

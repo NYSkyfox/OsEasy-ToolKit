@@ -10,7 +10,8 @@ from src.core.helpers import open_github_page
 
 
 _PRIV_METHOD_LABELS = {
-    "bypass": "提权方式: Fodhelper 注册表绕过 (静默)",
+    "bypass_fodhelper": "提权方式: Fodhelper 注册表绕过 (静默)",
+    "bypass_eventvwr": "提权方式: Eventvwr 注册表绕过 (静默备选)",
     "uac_dialog": "提权方式: UAC 弹窗确认",
     "manifest": "提权方式: 应用清单 (manifest) / 已为管理员",
 }
