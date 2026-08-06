@@ -1,6 +1,7 @@
 # src/gui/hotkey_manager.py
 # 快捷键管理中心
 
+import threading
 from collections import defaultdict
 
 from pynput import keyboard
@@ -83,7 +84,7 @@ class hotkey_manager:
         for key_combo in sorted(self.hotkeys.keys(), key=len, reverse=True):
             if key_combo.issubset(current):
                 for callback in self.hotkeys[key_combo]:
-                    callback()
+                    threading.Thread(target=callback, daemon=True).start()
                 self.current_keys.clear()  # 触发后清空状态
                 break
 
