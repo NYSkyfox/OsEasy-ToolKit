@@ -18,10 +18,6 @@ CMD = r"C:\Windows\System32\cmd.exe"
 FOD_HELPER = r"C:\Windows\System32\fodhelper.exe"
 REG_PATH = r"Software\Classes\ms-settings\shell\open\command"
 PYTHON_EXE = sys.executable
-# 用 pythonw.exe 避免黑框（如果存在的话）
-_pythonw = PYTHON_EXE.replace("python.exe", "pythonw.exe")
-if os.path.exists(_pythonw):
-    PYTHON_EXE = _pythonw
 UAC_BYPASS_FLAG_FILE = "__uac_bypass__"
 UAC_DIALOG_FLAG = "--uac-dialog"
 
