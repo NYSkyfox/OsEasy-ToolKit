@@ -147,20 +147,34 @@ def get_scshot() -> None:
     CF_DIB = 8
     size = len(dib_data)
     hmem = kernel32.GlobalAlloc(GMEM_MOVEABLE, size)
-    if hmem:
+    if not hmem:
+        print("DEBUG GlobalAlloc 失败")
+    else:
         ptr = kernel32.GlobalLock(hmem)
         buf2 = (ctypes.c_char * size).from_address(ptr)
         buf2[:] = dib_data
         kernel32.GlobalUnlock(hmem)
 
-        if user32.OpenClipboard(0):
-            user32.EmptyClipboard()
-            user32.SetClipboardData(CF_DIB, hmem)
-            user32.CloseClipboard()
-            print("DEBUG 截图已复制到剪贴板")
+        # 用 GetDesktopWindow() 作为剪贴板所有者，比 NULL 更可靠
+        hwnd = user32.GetDesktopWindow()
+        for attempt in range(5):
+            if user32.OpenClipboard(hwnd):
+                break
+            import time
+            time.sleep(0.01)
         else:
             kernel32.GlobalFree(hmem)
-            print("DEBUG 打开剪贴板失败")
+            print("DEBUG 打开剪贴板失败（重试5次后）")
+            hmem = 0  # 标记已释放
+
+        if hmem:
+            user32.EmptyClipboard()
+            if user32.SetClipboardData(CF_DIB, hmem):
+                print("DEBUG 截图已复制到剪贴板")
+            else:
+                kernel32.GlobalFree(hmem)
+                print("DEBUG SetClipboardData 失败")
+            user32.CloseClipboard()
 
     # 清理
     gdi32.DeleteObject(hbmp)
