@@ -4,7 +4,7 @@
 import json
 import os
 from config import CONFIG_FILE_PATH_TEMPLATE, DEFAULT_OSEASY_PATH, DEFAULT_STUDENT_EXE_NAME
-from src.core.helpers import check_give_file_path_is_excs, get_time_str
+from src.core.helpers import file_exists, get_time_str
 
 _username = os.environ.get('USERNAME') or 'Default'
 
@@ -14,7 +14,7 @@ class RuntimeConfig:
 
     def __init__(self):
         self.config_file_path = CONFIG_FILE_PATH_TEMPLATE.format(username=_username)
-        self.running_student_client_ver = 0
+        self.student_version = 0
         self.oseasypath_have_been_modified = False
         self.student_exe_name = DEFAULT_STUDENT_EXE_NAME
         self.oseasy_path = DEFAULT_OSEASY_PATH
@@ -47,7 +47,7 @@ class RuntimeConfig:
 
     def _read_config_raw(self) -> str:
         """从配置文件读取原始字符串"""
-        if check_give_file_path_is_excs(self.config_file_path):
+        if file_exists(self.config_file_path):
             with open(self.config_file_path, "r", encoding="utf-8") as f:
                 return f.read()
         else:
@@ -127,4 +127,4 @@ class RuntimeConfig:
         self._cache_write(data)
 
 
-toolbox_cfg = RuntimeConfig()
+toolkit_cfg = RuntimeConfig()

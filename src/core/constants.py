@@ -24,5 +24,5 @@ except (FileNotFoundError, OSError):
         os.makedirs(p, mode=0o777, exist_ok=True)
 
 # 运行时状态标志
-is_box_killer_running = False
+is_kit_killer_running = False
 is_protect_killer_script_running = False

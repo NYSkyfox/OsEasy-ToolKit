@@ -2,33 +2,63 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 
-python -m PyInstaller ^
-    --onefile ^
-    --noconsole ^
-    --icon=logo.ico ^
-    --name=OsEasy-ToolBox ^
-    --manifest app.manifest ^
-    --add-data "venv\Lib\site-packages\flet;flet" ^
-    --add-data "venv\Lib\site-packages\flet_desktop;flet_desktop" ^
-    --hidden-import=flet ^
-    --hidden-import=flet_desktop ^
-    --hidden-import=pdb ^
-    --hidden-import=doctest ^
-    --hidden-import=inspect ^
-    --hidden-import=traceback ^
-    --hidden-import=pyrect ^
-    --hidden-import=win32clipboard ^
-    --hidden-import=email ^
-    --hidden-import=email.mime ^
-    --hidden-import=email.mime.multipart ^
-    --hidden-import=email.mime.text ^
-    --hidden-import=email.mime.base ^
-    --hidden-import=urllib.request ^
-    --hidden-import=urllib.parse ^
-    --upx-dir "tools\upx-5.2.0-win64" ^
-    --upx-exclude "email*" ^
-    --upx-exclude "urllib*" ^
-    --upx-exclude "ssl*" ^
-    --add-data "Fake_SCR.py;." ^
-    --add-data "config.py;." ^
-    main.py
+:: ============================================
+:: OsEasy-ToolKit 一键打包脚本
+:: 直接调用 build.py（不关心 venv / 全局 Python）
+:: ============================================
+
+echo.
+echo ============================================
+echo   OsEasy-ToolKit 打包脚本
+echo ============================================
+echo.
+
+:: 1. 找可用的 Python
+set PYTHON=
+for %%p in (python python3 py) do (
+    where %%p >nul 2>&1
+    if not errorlevel 1 (
+        set PYTHON=%%p
+        goto :found_python
+    )
+)
+
+echo [错误] 未找到 Python，请先安装 Python 3
+echo        下载地址: https://www.python.org/downloads/
+pause
+exit /b 1
+
+:found_python
+echo [Python] %PYTHON%
+
+:: 2. 确保 PyInstaller 已安装
+%PYTHON% -m PyInstaller --version >nul 2>&1
+if errorlevel 1 (
+    echo [依赖] PyInstaller 未安装，正在安装...
+    %PYTHON% -m pip install pyinstaller
+    if errorlevel 1 (
+        echo [错误] PyInstaller 安装失败
+        pause
+        exit /b 1
+    )
+) else (
+    echo [依赖] PyInstaller 已安装
+)
+
+:: 3. 调用 build.py
+echo.
+echo [开始] 启动打包流程...
+echo.
+%PYTHON% build.py
+
+:: 4. 结果
+if errorlevel 1 (
+    echo.
+    echo [失败] 打包出错，查看上方日志。
+    pause
+    exit /b 1
+)
+
+echo.
+echo [完成] 按任意键退出...
+pause >nul

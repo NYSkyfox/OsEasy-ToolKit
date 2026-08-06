@@ -4,14 +4,12 @@
 
 from src.utils.__init__ import (
     get_time_str,
-    check_give_file_path_is_excs,
+    file_exists,
     get_ipv4_address,
     open_github_page,
     run_sigle_cmd,
     use_bat_file_to_run_cmd,
     runbat,
-    get_god_potato_path,
-    run_cmd_with_god_potato,
     del_historyrem,
 )
 
@@ -26,8 +24,8 @@ def pass_ui_class(ui) -> None:
     Ui_Class = ui
 
 
-def Ui_call_show_snake_message(*msg: tuple) -> None:
-    """Ui类 显示底部弹窗"""
+def show_snack(*msg: tuple) -> None:
+    """通过 Ui 实例弹出 SnackBar 消息（供非 UI 模块调用）"""
     mix = ""
     for i in msg:
         mix += str(i) + " "

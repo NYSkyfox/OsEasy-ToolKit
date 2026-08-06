@@ -7,8 +7,8 @@ from ctypes import wintypes
 import flet as ft
 
 from src.modules.dll_manager import run_easy_dll, easy_dll
-from src.core.runtime_config import toolbox_cfg
-from src.core.helpers import Ui_call_show_snake_message
+from src.core.runtime_config import toolkit_cfg
+from src.core.helpers import show_snack
 
 
 def query_all_control_status():
@@ -16,7 +16,7 @@ def query_all_control_status():
     msgs = []
 
     # ---- USB 管控 ----
-    dll_path = toolbox_cfg.oseasy_path + "\\x64\\easyusbctrl.dll"
+    dll_path = toolkit_cfg.oseasy_path + "\\x64\\easyusbctrl.dll"
     try:
         dll_loader = easy_dll(dll_path)
         runner = dll_loader.setup_function(
@@ -33,7 +33,7 @@ def query_all_control_status():
         msgs.append(f"USB管控查询异常: {e}")
 
     # ---- 网络管控 ----
-    dll_path = toolbox_cfg.oseasy_path + "\\x64\\OeNetlimit.dll"
+    dll_path = toolkit_cfg.oseasy_path + "\\x64\\OeNetlimit.dll"
     try:
         dll_loader = easy_dll(dll_path)
         runner = dll_loader.setup_function("EnableNet", restype=ctypes.c_int, argtypes=[])
@@ -44,7 +44,7 @@ def query_all_control_status():
     except Exception as e:
         msgs.append(f"网络管控查询异常: {e}")
 
-    Ui_call_show_snake_message("\n".join(msgs))
+    show_snack("\n".join(msgs))
 
 
 class PageDll:

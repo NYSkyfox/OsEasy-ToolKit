@@ -4,30 +4,30 @@
 import os
 import re
 import time
+import urllib.request
 
-import httpx
-
-from src.core.runtime_config import toolbox_cfg
-from src.core.helpers import check_give_file_path_is_excs, run_sigle_cmd, get_ipv4_address
-from src.modules.killer import check_killer_script_is_alreay_start
+from config import SOURCE_NAME
+from src.core.runtime_config import toolkit_cfg
+from src.core.helpers import file_exists, run_sigle_cmd, get_ipv4_address
+from src.modules.killer import ensure_killer_running
 
 
 def replace_screen_render() -> bool:
     """替换原有scr用于拦截远程命令"""
     filename = "ScreenRender_Helper.exe"
     nowcurhelper = os.path.join(os.getcwd(), filename)
-    copypath = os.path.join(toolbox_cfg.oseasy_path, filename)
+    copypath = os.path.join(toolkit_cfg.oseasy_path, filename)
 
-    check_killer_script_is_alreay_start()
-    if not check_give_file_path_is_excs(nowcurhelper):
+    ensure_killer_running()
+    if not file_exists(nowcurhelper):
         return False
 
-    run_sigle_cmd(f'rename "{toolbox_cfg.oseasy_path}ScreenRender.exe" "ScreenRender_Y.exe"')
+    run_sigle_cmd(f'rename "{toolkit_cfg.oseasy_path}ScreenRender.exe" "ScreenRender_Y.exe"')
     time.sleep(2.5)
     run_sigle_cmd(f'copy "{nowcurhelper}" "{copypath}"')
     time.sleep(2.5)
     run_sigle_cmd(
-        f'rename "{toolbox_cfg.oseasy_path}ScreenRender_Helper.exe" "ScreenRender.exe"'
+        f'rename "{toolkit_cfg.oseasy_path}ScreenRender_Helper.exe" "ScreenRender.exe"'
     )
     return True
 
@@ -35,8 +35,8 @@ def replace_screen_render() -> bool:
 def restone_screen_render() -> bool:
     """还原原有的ScreenRender"""
 
-    check_killer_script_is_alreay_start()
-    path = f"{toolbox_cfg.oseasy_path}ScreenRender.exe"
+    ensure_killer_running()
+    path = f"{toolkit_cfg.oseasy_path}ScreenRender.exe"
 
     a = check_replace_screen_render_status()
     if a == False:
@@ -46,7 +46,7 @@ def restone_screen_render() -> bool:
         os.remove(path)
     except FileNotFoundError:
         pass
-    run_sigle_cmd(f'rename "{toolbox_cfg.oseasy_path}ScreenRender_Y.exe" "ScreenRender.exe"')
+    run_sigle_cmd(f'rename "{toolkit_cfg.oseasy_path}ScreenRender_Y.exe" "ScreenRender.exe"')
 
     return True
 
@@ -55,14 +55,14 @@ def check_replace_screen_render_status() -> bool:
     """通过检查SCR_Y是否存在
     来检查是否已经完成替换拦截程序
     返回True/False"""
-    check_path = f"{toolbox_cfg.oseasy_path}ScreenRender_Y.exe"
-    return check_give_file_path_is_excs(check_path)
+    check_path = f"{toolkit_cfg.oseasy_path}ScreenRender_Y.exe"
+    return file_exists(check_path)
 
 
 def from_log_file_get_remote_cmd() -> str | None:
     """从文件中读取拦截到的远程命令
     未读取到返回None"""
-    return toolbox_cfg.get_config_key_data("broadcast_cmd")
+    return toolkit_cfg.get_config_key_data("broadcast_cmd")
 
 
 def parse_screenrender_log():
@@ -74,16 +74,16 @@ def parse_screenrender_log():
     `Returns`
         `list`: 包含处理后的命令部分的列表。
     """
-    from src.core.helpers import Ui_call_show_snake_message
+    from src.core.helpers import show_snack
     # 获取 %appdata% 路径
     appdata_path = os.getenv("APPDATA")
     if not appdata_path:
-        Ui_call_show_snake_message("无法获取 %APPDATA% 路径")
+        show_snack("无法获取 %APPDATA% 路径")
         return False, []
 
     log_path = os.path.join(appdata_path, "Mmc", "ScreenRender.log")
     if not os.path.exists(log_path):
-        Ui_call_show_snake_message(f"日志文件不存在: {log_path}")
+        show_snack(f"日志文件不存在: {log_path}")
         return False, []
 
     # 匹配特定格式的正则表达式
@@ -101,7 +101,7 @@ def parse_screenrender_log():
                     processed_command = command.replace('"', "#")
                     result.append(processed_command)
     except Exception as e:
-        Ui_call_show_snake_message(f"读取日志文件时发生错误: {e}")
+        show_snack(f"读取日志文件时发生错误: {e}")
         return False, []
 
     if len(result) == 0:
@@ -128,8 +128,8 @@ def save_scr_log_cmd_to_file(log_list=None) -> None:
         f.write("\n".join(log_list))
 
 
-def from_scr_log_cmd_get_yccmd() -> None:
-    """从屏幕广播日志中提取广播命令并保存到文件"""
+def extract_yc_cmd_from_log() -> None:
+    """从 ScreenRender 日志中提取最近一条广播命令并保存"""
 
     status, log_list = parse_screenrender_log()
     if not status:
@@ -142,19 +142,19 @@ def from_scr_log_cmd_get_yccmd() -> None:
 
 def handin_save_yc_cmd(save_cmd, replace_ip=True) -> None:
     """手动保存拦截的命令"""
-    from src.core.helpers import Ui_call_show_snake_message
+    from src.core.helpers import show_snack
 
     if replace_ip:
         localIp = get_ipv4_address()
-        Ui_call_show_snake_message(f"已自动替换本地IP地址为{localIp}")
+        show_snack(f"已自动替换本地IP地址为{localIp}")
         save_cmd = re.sub(r"(#local#:)(#.*?#)", rf"\1#{localIp}#", save_cmd)
 
-    toolbox_cfg.set_config_key_data("broadcast_cmd", save_cmd)
+    toolkit_cfg.set_config_key_data("broadcast_cmd", save_cmd)
 
 
 def generate_remote_cmd_and_save(teacher_ip) -> None:
     """生成拦截的命令并保存"""
-    from src.core.helpers import Ui_call_show_snake_message
+    from src.core.helpers import show_snack
     localIp = get_ipv4_address()
 
     cmd_base = "{#decoderName#:#h264#,#fullscreen#:0,#local#:#172.18.36.132#,#port#:7778,#remote#:#229.1.36.200#,#teacher_ip#:0,#verityPort#:7788}"
@@ -162,11 +162,11 @@ def generate_remote_cmd_and_save(teacher_ip) -> None:
     save_cmd = re.sub(r"(#local#:)(#.*?#)", rf"\1#{localIp}#", cmd_base)
     save_cmd = re.sub(r"(#remote#:)(#.*?#)", rf"\1#{teacher_ip}#", save_cmd)
 
-    toolbox_cfg.set_config_key_data("broadcast_cmd", save_cmd)
+    toolkit_cfg.set_config_key_data("broadcast_cmd", save_cmd)
 
     print("[DEBUG]", save_cmd)
 
-    Ui_call_show_snake_message(
+    show_snack(
         f"已尝试按照模板生成广播命令\n若无法使用请使用拦截方案获取命令"
     )
 
@@ -176,10 +176,10 @@ def build_run_broadcast_cmd(YC_command) -> str:
 
     status = check_replace_screen_render_status()
     if status == True:
-        fdb = f'"{toolbox_cfg.oseasy_path}ScreenRender_Y.exe" {YC_command}'
+        fdb = f'"{toolkit_cfg.oseasy_path}ScreenRender_Y.exe" {YC_command}'
         return fdb
     else:
-        fdb = f'"{toolbox_cfg.oseasy_path}ScreenRender.exe" {YC_command}'
+        fdb = f'"{toolkit_cfg.oseasy_path}ScreenRender.exe" {YC_command}'
         return fdb
 
 
@@ -187,7 +187,7 @@ def save_now_broadcast_cmd() -> bool | None:
     """保存现在获取到的远程指令到程序目录"""
     savepath = os.getcwd() + "\\" + "command.txt"
 
-    cmd = toolbox_cfg.get_config_key_data("broadcast_cmd")
+    cmd = toolkit_cfg.get_config_key_data("broadcast_cmd")
     if not cmd:
         return False
 
@@ -198,7 +198,7 @@ def save_now_broadcast_cmd() -> bool | None:
 
 def try_get_teacher_ip() -> str | None:
     """尝试从广播命令中提取教师机IP"""
-    bdcmd = toolbox_cfg.get_config_key_data("broadcast_cmd")
+    bdcmd = toolkit_cfg.get_config_key_data("broadcast_cmd")
 
     if not bdcmd:
         return None
@@ -214,17 +214,21 @@ def try_get_teacher_ip() -> str | None:
 
 
 def blow_teacher_client():
-    from src.core.helpers import Ui_call_show_snake_message
+    from src.core.helpers import show_snack
     ip = try_get_teacher_ip()
     if ip is None:
-        Ui_call_show_snake_message("未获取到教师机IP")
+        show_snack("未获取到教师机IP")
         return
     headers = {
-        "User-Agent": "OsEzToolBox"
+        "User-Agent": SOURCE_NAME
     }
     uri = "http://" + ip + ":9003"
-    res = httpx.get(uri, headers=headers)
-    tip = "教师端返回了无效的响应" if res.status_code != 400 \
-        else "已断开教师端的连接\n可能需要约10秒生效"
-    Ui_call_show_snake_message(tip)
-    res.close()
+    req = urllib.request.Request(uri, headers=headers)
+    try:
+        res = urllib.request.urlopen(req, timeout=5)
+        tip = "教师端返回了无效的响应" if res.status != 400 \
+            else "已断开教师端的连接\n可能需要约10秒生效"
+        res.close()
+    except Exception as e:
+        tip = f"请求失败: {e}"
+    show_snack(tip)

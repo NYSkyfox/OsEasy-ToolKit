@@ -2,13 +2,15 @@
 # 进程管理页（页面 0）
 
 import flet as ft
+import os
 
 from src.core.helpers import run_sigle_cmd
+from src.core.runtime_config import toolkit_cfg
 from src.modules.killer import (
-    register_killer_script, del_register_killer, killer_script_protect,
-    start_oseasy_self_toolbox,
+    launch_oe_toolkit, is_sethc_hijacked,
 )
 from src.modules.service_manager import check_mmpc_status, handle_start_student_client
+from src.utils.program.persistent_switch import PersistentSwitch
 
 
 class PageProcess:
@@ -31,16 +33,22 @@ class PageProcess:
             on_hover=self.only_update_MMPC_status,
         )
 
-        ui.guaqi_sw = ft.Switch(
+        ui.guaqi_sw = PersistentSwitch(
+            config_key="guaqi_enabled",
             label="挂起学生端",
-            active_color=ui.accent_color,
-            on_change=ui.guaqi_chufa,
+            on_toggle=ui._on_guaqi_changed,
         )
 
-        ui.protect_swc = ft.Switch(
+        ui.protect_swc = PersistentSwitch(
+            config_key="protect_killer_enabled",
             label="外部cmd守护进程",
-            active_color=ui.accent_color,
-            on_change=lambda _: killer_script_protect(),
+            on_toggle=ui._on_protect_killer_changed,
+        )
+
+        ui.sethc_swc = PersistentSwitch(
+            live_getter=is_sethc_hijacked,
+            label="劫持粘滞键 (sethc.exe)",
+            on_toggle=ui._on_sethc_toggle,
         )
 
         return ft.Column(controls=[
@@ -48,12 +56,24 @@ class PageProcess:
             ui.mmpc_Stext, ui.mmpc_sw,
             ft.FilledTonalButton(text="长按重启学生端", icon=ft.icons.RESTORE, on_long_press=handle_start_student_client),
             ft.FilledTonalButton(text="重新获取学生端路径", icon=ft.icons.REFRESH, on_click=ui.reflashStudentPath),
-            ft.FilledTonalButton(text="注册粘滞键替换", icon=ft.icons.FILE_COPY_ROUNDED, on_click=lambda _: register_killer_script()),
-            ft.FilledTonalButton(text="还原粘滞键", icon=ft.icons.FILE_COPY_ROUNDED, on_click=lambda _: del_register_killer()),
+            ui.sethc_swc,
             ui.protect_swc,
             ui.guaqi_sw,
-            ft.FilledTonalButton(text="打开噢易自带工具", icon=ft.icons.OPEN_IN_NEW, on_click=start_oseasy_self_toolbox),
+            ft.FilledTonalButton(text="打开噢易自带工具", icon=ft.icons.OPEN_IN_NEW, on_click=launch_oe_toolkit),
+            ft.FilledTonalButton(
+                text="打开OsEasy安装目录",
+                icon=ft.icons.FOLDER_OPEN,
+                on_click=self.open_oseasy_dir,
+            ),
         ])
+
+    def open_oseasy_dir(self, *e):
+        """在资源管理器中打开 OsEasy 安装目录"""
+        path = toolkit_cfg.oseasy_path
+        if os.path.exists(path):
+            os.startfile(path)
+        else:
+            self.ui.show_snakemessage(f"目录不存在: {path}")
 
     def only_update_MMPC_status(self, *e):
         ui = self.ui

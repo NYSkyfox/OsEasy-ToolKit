@@ -54,12 +54,12 @@ def run_easy_dll(
     - `after_run_func`: 运行完毕后的回调函数
 
     """
-    from src.core.runtime_config import toolbox_cfg
-    from src.core.helpers import Ui_call_show_snake_message
+    from src.core.runtime_config import toolkit_cfg
+    from src.core.helpers import show_snack
 
     print("dllUse debug >", dll_name, func_name, return_type, argtypes, out_buffer)
 
-    dll_path = toolbox_cfg.oseasy_path + dll_name
+    dll_path = toolkit_cfg.oseasy_path + dll_name
 
     dll_loader = easy_dll(dll_path)
 
@@ -71,7 +71,7 @@ def run_easy_dll(
         else:
             result = runner(out_buffer)
     except Exception as e:
-        Ui_call_show_snake_message(f"调用失败 抛出异常：\n{e}")
+        show_snack(f"调用失败 抛出异常：\n{e}")
         return
 
     print("[DEBUG] dll result:", result)
@@ -85,7 +85,7 @@ def run_easy_dll(
         print("[DEBUG] Error message:", error_msg)
         ui_show_msg += f"\n错误信息: {error_msg}"
 
-    Ui_call_show_snake_message(ui_show_msg)
+    show_snack(ui_show_msg)
 
     if after_run_func is not None:
         after_run_func()

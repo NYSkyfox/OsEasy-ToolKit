@@ -8,23 +8,39 @@ import random
 import flet as ft
 from pynput import keyboard
 
-from config import APP_VERSION, DEFAULT_YIYAN_LIST, DEFAULT_SHOW_YIYAN, DEFAULT_ACCENT_COLOR
+from config import APP_VERSION, RELEASE_NAME, DEFAULT_YIYAN_LIST, DEFAULT_SHOW_YIYAN, DEFAULT_ACCENT_COLOR
 
-from src.core.runtime_config import toolbox_cfg
+from src.core.runtime_config import toolkit_cfg
 from src.core.helpers import pass_ui_class, run_sigle_cmd
-from src.modules.service_manager import try_guess_student_client_version
+from src.modules.service_manager import detect_student_version
 from src.modules.process_manager import utils, get_scshot
 
 from src.modules.broadcast_handler import (
     from_log_file_get_remote_cmd, build_run_broadcast_cmd,
 )
-from src.modules.killer import del_locked_exe_then_logout
+
 from src.gui.hotkey_manager import hotkey_manager
+from src.utils.program.persistent_switch import PersistentSwitch
 from src.gui.pages import (
     PageProcess, PageOther, PageBroadcast, PageCommands,
-    PageDll, PageAppearance, PageAbout,
+    PageDll, PageSettings, PageAbout,
 )
-from src.utils.win_utils import get_windows_accent_color, get_windows_default_font
+from src.utils.system.win_utils import get_windows_accent_color, get_windows_default_font
+
+# 配置文件中保存的设置 key 名
+_SETTING_KEYS = {
+    "theme_mode": "theme_mode",
+    "follow_system_accent": "follow_system_accent",
+    "random_yiyan": "random_yiyan_enabled",
+    "bg_opacity": "bg_opacity",
+    "hide_tbox": "hide_tbox_hotkey",
+    "fast_screenshot": "fast_screenshot_hotkey",
+    "run_window_broadcast": "run_window_broadcast_hotkey",
+    "kill_screen_render": "kill_screen_render_hotkey",
+    "run_fullscreen_broadcast": "run_fullscreen_broadcast_hotkey",
+    "guaqi": "guaqi_enabled",
+    "protect_killer": "protect_killer_enabled",
+}
 
 fontpath = get_windows_default_font()
 
@@ -33,6 +49,7 @@ class Ui:
 
     def __init__(self) -> None:
         self.ver = APP_VERSION
+        self.release_name = RELEASE_NAME
         self.hotkeyManager = hotkey_manager()
         self.guaqi_runstatus = False
         self.bgtmd = 0.6
@@ -40,7 +57,7 @@ class Ui:
         self.random_yy_enabled = False
         self.follow_system_accent = True  # 默认跟随系统主题色
         self.accent_color = get_windows_accent_color()
-        self.theme_mode_key = "system"   # 主题模式: system / light / dark
+        self.theme_mode_key = "system"
         self.font_loadtime = 1
         self.NowSelIndex = "0"
         self.yiyanshowtext = ft.Text("", size=16)
@@ -79,32 +96,47 @@ class Ui:
         )
         self.page.update()
 
-    def close_askdel_dlg(self, xueze):
-        self.unlock_func_askdlg.open = False
-        self.page.update()
-        if xueze is None:
-            self.show_snakemessage("取消解锁了")
-        else:
-            del_locked_exe_then_logout(xueze)
+    def update_theme(self, font_family=None):
+        if font_family is None:
+            font_family = getattr(self.page.theme, "font_family", "ht")
+        self.page.theme = ft.Theme(
+            font_family=font_family,
+            color_scheme_seed=self.accent_color,
+        )
 
-    def open_askdel_dlg(self, *e):
-        self.page.dialog = self.unlock_func_askdlg
-        self.unlock_func_askdlg.open = True
-        self.page.update()
-
-    def close_col_readme_dlg(self):
-        self.col_readme_dlg.open = False
-        self.show_snakemessage("Have Fun")
-        self.page.update()
-
-    def open_col_readme_dlg(self, *e):
-        self.page.dialog = self.col_readme_dlg
-        self.col_readme_dlg.open = True
-        self.page.update()
-
-    def hide_toolbox_helper(self):
+    def hide_toolkit_helper(self):
         self.page.window_visible = not self.page.window_visible
         self.page.update()
+
+    def _on_hide_tbox_changed(self):
+        self.hotkeyManager.switch_reg_helper(
+            self.hide_tbox_swc.value, [keyboard.Key.caps_lock, keyboard.Key.enter],
+            self.hide_toolkit_helper,
+        )
+
+    def _on_fast_screenshot_changed(self):
+        self.hotkeyManager.switch_reg_helper(
+            self.FastGetSC.value, [keyboard.Key.alt_l, 'x'], get_scshot,
+        )
+
+    def _on_run_window_broadcast_changed(self):
+        self.hotkeyManager.switch_reg_helper(
+            self.runwindows_swc.value, [keyboard.Key.alt_l, 'u'],
+            self._pages[2].run_win_gbcmd_loj,
+        )
+
+    def _on_kill_screen_render_changed(self):
+        self.hotkeyManager.switch_reg_helper(
+            self.KillSCR_swc.value, [keyboard.Key.alt_l, 'k'],
+            self.direct_kill_screen_render,
+        )
+
+    def _on_run_fullscreen_broadcast_changed(self):
+        self.hotkeyManager.switch_reg_helper(
+            self.RunFullSC_swc.value,
+            [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
+            self.direct_run_fullscreen_boradcast_cmd,
+        )
 
     # ============================================================
     #  主入口
@@ -112,9 +144,13 @@ class Ui:
 
     def main(self, bruh: ft.Page):
         self.page = bruh
-        self.page.title = self.ver
+        self.page.title = self.release_name
         self.page.fonts = {"ht": fontpath}
-        self.page.theme = ft.Theme(font_family="ht")
+        self.page.theme = ft.Theme(
+            font_family="ht",
+            color_scheme_seed=self.accent_color,
+        )
+        self.page.theme_mode = ft.ThemeMode.SYSTEM if hasattr(ft.ThemeMode, "SYSTEM") else ft.ThemeMode.LIGHT
         self.page.window_height = 635
         self.page.window_width = 450
         self.page.window_max_height = 2000
@@ -130,44 +166,16 @@ class Ui:
         self.font_pick_files_dialog = ft.FilePicker(on_result=self.font_pick_files_result)
         self.list_all_pickdialog = [self.pick_files_dialog, self.yiyan_pick_files_dialog, self.font_pick_files_dialog]
 
-        self.unlock_func_askdlg = ft.AlertDialog(
-            modal=True, title=ft.Text("解锁选项"),
-            content=ft.Text("选择适合你的选项\n三者一起: 删除黑屏安静+解除键盘锁+删除控屏锁定程序 (需要注销)\n仅控屏: 仅删除控屏锁定程序"),
-            actions=[
-                ft.TextButton("三者一起", on_click=lambda _: self.close_askdel_dlg(xueze=True)),
-                ft.TextButton("仅控屏锁定程序", on_click=lambda _: self.close_askdel_dlg(xueze=False)),
-                ft.TextButton("取消", on_click=lambda _: self.close_askdel_dlg(xueze=None)),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-
-        self.col_readme_dlg = ft.AlertDialog(
-            modal=True, title=ft.Text("控屏管理页使用说明"),
-            content=ft.Text("在使用前请先使用解锁键盘锁&删除控制锁定软件功能\n点击替换拦截程序后再恢复控屏软件\n等待老师控制屏幕后即完成拦截远程命令\n完成替换后即可重新删除控屏软件\n此时当老师处于控制状态时你可以主动运行命令弹出窗口化共享屏幕\n实现自由的同时不影响听课!!\n当老师来时你可以使用快捷键启动全屏参数的控制\n等待老师走后再用快捷键清理进程"),
-            actions=[ft.TextButton("晓得了", on_click=lambda _: self.close_col_readme_dlg())],
-            actions_alignment=ft.MainAxisAlignment.END,
-            on_dismiss=lambda _: self.close_col_readme_dlg(),
-        )
-
-        self.col_readme_dig = ft.FilledButton("点我查看此页面的使用说明", on_click=self.open_col_readme_dlg)
-
-        self.hide_tbox_swc = ft.Switch(
+        self.hide_tbox_swc = PersistentSwitch(
+            config_key=_SETTING_KEYS["hide_tbox"],
             label="capsLock + enter 隐&显工具箱",
-            on_change=lambda _: self.hotkeyManager.switch_reg_helper(
-                self.hide_tbox_swc.value,
-                [keyboard.Key.caps_lock, keyboard.Key.enter],
-                self.hide_toolbox_helper,
-            ),
-            value=True,
-            active_color=self.accent_color,
+            on_toggle=lambda _: self._on_hide_tbox_changed(),
         )
 
-        self.FastGetSC = ft.Switch(
+        self.FastGetSC = PersistentSwitch(
+            config_key=_SETTING_KEYS["fast_screenshot"],
             label="Alt+X 快捷键屏幕截图",
-            active_color=self.accent_color,
-            on_change=lambda _: self.hotkeyManager.switch_reg_helper(
-                self.FastGetSC.value, [keyboard.Key.alt_l, 'x'], get_scshot
-            ),
+            on_toggle=lambda _: self._on_fast_screenshot_changed(),
         )
 
         # ---- 页面实例 ----
@@ -178,7 +186,7 @@ class Ui:
             PageBroadcast(self),
             PageCommands(self),
             PageDll(self),
-            PageAppearance(self),
+            PageSettings(self),
             PageAbout(self),
         ]
 
@@ -193,7 +201,7 @@ class Ui:
                 ft.NavigationRailDestination(icon=ft.icons.SCREEN_SHARE_OUTLINED, selected_icon_content=ft.Icon(ft.icons.SCREEN_SHARE_SHARP), label_content=ft.Text("广播管理")),
                 ft.NavigationRailDestination(icon=ft.icons.VPN_KEY_OUTLINED, selected_icon_content=ft.Icon(ft.icons.VPN_KEY), label="广播命令"),
                 ft.NavigationRailDestination(icon=ft.icons.KEYBOARD_OPTION_KEY_OUTLINED, selected_icon_content=ft.Icon(ft.icons.KEYBOARD_OPTION_KEY), label="DLL工具"),
-                ft.NavigationRailDestination(icon=ft.icons.STYLE_OUTLINED, selected_icon_content=ft.Icon(ft.icons.STYLE), label_content=ft.Text("外观")),
+                ft.NavigationRailDestination(icon=ft.icons.SETTINGS_OUTLINED, selected_icon_content=ft.Icon(ft.icons.SETTINGS), label_content=ft.Text("设置")),
                 ft.NavigationRailDestination(icon=ft.icons.FAVORITE_BORDER_OUTLINED, selected_icon_content=ft.Icon(ft.icons.FAVORITE, color="red"), label="关于"),
             ],
             on_change=lambda e: self.selPages_Helper(e.control.selected_index),
@@ -204,13 +212,9 @@ class Ui:
         self.selPages_Helper(0)
         self.added_pickdialog()
         self.try_get_history_path()
+        self.try_restore_settings()
         self.reflashStudentPath()
         pass_ui_class(self)
-        self.hotkeyManager.switch_reg_helper(
-            self.hide_tbox_swc.value,
-            [keyboard.Key.caps_lock, keyboard.Key.enter],
-            self.hide_toolbox_helper,
-        )
 
     # ============================================================
     #  页面切换
@@ -232,9 +236,7 @@ class Ui:
         else:
             nedadd = ft.Row([self.MyRail, ft.VerticalDivider(width=1), needLoad_Stuff_list],
                             height=self.page.window_height, width=self.page.window_width)
-        self.page.clean()
-        self.page.update()
-        self.page.add(nedadd)
+        self.page.controls = [nedadd]
         self.page.update()
 
     # ============================================================
@@ -242,18 +244,35 @@ class Ui:
     # ============================================================
 
     def reflashStudentPath(self, *e):
-        _ = try_guess_student_client_version()
-        if toolbox_cfg.oseasypath_have_been_modified:
+        _ = detect_student_version()
+        if toolkit_cfg.oseasypath_have_been_modified:
             guess_msg = f"猜测的学生端版本 v{_ / 10}" if _ != 0 else '检测学生端版本特征失败'
-            self.show_snakemessage(f"更新学生端路径成功\n{toolbox_cfg.oseasy_path}\n学生端进程名:{toolbox_cfg.student_exe_name}\n{guess_msg}")
+            self.show_snakemessage(f"更新学生端路径成功\n{toolkit_cfg.oseasy_path}\n学生端进程名:{toolkit_cfg.student_exe_name}\n{guess_msg}")
         else:
             self.show_snakemessage("更新路径失败\n也许是学生端未运行??")
+
+    def _on_guaqi_changed(self, *e):
+        """挂起学生端开关变更"""
+        self.guaqi_chufa()
+
+    def _on_protect_killer_changed(self, *e):
+        """外部cmd守护进程开关变更"""
+        from src.modules.killer import killer_script_protect
+        killer_script_protect()
+
+    def _on_sethc_toggle(self, *e):
+        """粘滞键劫持开关"""
+        from src.modules.killer import register_killer_script, del_register_killer
+        if self.sethc_swc.value:
+            register_killer_script()
+        else:
+            del_register_killer()
 
     def guaqi_chufa(self, *e):
         if not self.guaqi_runstatus:
             self.page.window_visible = False
             self.page.update()
-            status = utils.guaqi_process(toolbox_cfg.student_exe_name)
+            status = utils.guaqi_process(toolkit_cfg.student_exe_name)
             utils.guaqi_process("MultiClient.exe")
             if status is True:
                 self.guaqi_runstatus = True
@@ -262,16 +281,21 @@ class Ui:
                 self.page.update()
             else:
                 self.page.window_visible = True
+                self.guaqi_runstatus = False
+                toolkit_cfg.set_config_key_data(_SETTING_KEYS["guaqi"], False)
                 self.guaqi_sw.value = False
                 self.page.update()
                 self.show_snakemessage(status)
         else:
-            status = utils.huifu_process(toolbox_cfg.student_exe_name)
+            status = utils.huifu_process(toolkit_cfg.student_exe_name)
             utils.huifu_process("MultiClient.exe")
             if status is True:
                 self.guaqi_runstatus = False
+                toolkit_cfg.set_config_key_data(_SETTING_KEYS["guaqi"], False)
             else:
-                self.guaqi_sw.value = False
+                self.guaqi_runstatus = True
+                toolkit_cfg.set_config_key_data(_SETTING_KEYS["guaqi"], True)
+                self.guaqi_sw.value = True
                 self.page.update()
                 self.show_snakemessage(status)
 
@@ -280,24 +304,94 @@ class Ui:
     # ============================================================
 
     def try_get_history_path(self):
-        fstst = toolbox_cfg.first_launch_check()
+        fstst = toolkit_cfg.first_launch_check()
         if not fstst:
-            bgPath = toolbox_cfg.get_style_path("bgPath")
+            bgPath = toolkit_cfg.get_style_path("bgPath")
             if bgPath:
                 self.bgpath = bgPath
                 self.loaded_bg = True
                 self.reflash_ui_bg()
-            yiyanPath = toolbox_cfg.get_style_path("yiyanPath")
+            yiyanPath = toolkit_cfg.get_style_path("yiyanPath")
             if yiyanPath:
                 self.yiyanfpath = yiyanPath
                 self.from_file_load_yiyan()
-            fontPath = toolbox_cfg.get_style_path("fontPath")
+            fontPath = toolkit_cfg.get_style_path("fontPath")
             if fontPath:
                 self.zdy_fontpath = fontPath
                 self.setup_zidingyi_font()
 
+    def try_restore_settings(self):
+        """从配置文件恢复用户设置状态"""
+        # 主题模式
+        saved_theme = toolkit_cfg.get_config_key_data(_SETTING_KEYS["theme_mode"])
+        if saved_theme in ("system", "light", "dark"):
+            self.theme_mode_key = saved_theme
+            self.set_theme_mode()
+            if hasattr(self, "theme_dropdown"):
+                self.theme_dropdown.value = saved_theme
+
+        # 系统主题色跟随
+        saved_accent = toolkit_cfg.get_config_key_data(_SETTING_KEYS["follow_system_accent"])
+        if saved_accent is not None:
+            self.follow_system_accent = bool(saved_accent)
+            if not self.follow_system_accent:
+                self.accent_color = DEFAULT_ACCENT_COLOR
+            self.update_theme()
+
+        # 随机一言
+        saved_yy = toolkit_cfg.get_config_key_data(_SETTING_KEYS["random_yiyan"])
+        if saved_yy is not None:
+            self.random_yy_enabled = bool(saved_yy)
+            self.pick_a_random_yiyan()
+
+        # 背景不透明度
+        saved_opacity = toolkit_cfg.get_config_key_data(_SETTING_KEYS["bg_opacity"])
+        if saved_opacity is not None:
+            try:
+                self.bgtmd = float(saved_opacity)
+            except (TypeError, ValueError):
+                pass
+
+        # 挂起学生端状态
+        saved_guaqi = toolkit_cfg.get_config_key_data(_SETTING_KEYS["guaqi"])
+        if saved_guaqi is not None:
+            self.guaqi_runstatus = bool(saved_guaqi)
+
+        # 初始注册快捷键（根据恢复后的状态）
+        self.hotkeyManager.switch_reg_helper(
+            self.hide_tbox_swc.value,
+            [keyboard.Key.caps_lock, keyboard.Key.enter],
+            self.hide_toolkit_helper,
+        )
+        self.hotkeyManager.switch_reg_helper(
+            self.FastGetSC.value, [keyboard.Key.alt_l, 'x'], get_scshot,
+        )
+
+        # 广播页的快捷键在 page_broadcast.build() 中恢复（此时控件尚未创建）
+
+    def _restore_broadcast_hotkeys(self):
+        """广播页快捷键初始注册（首次 build 时调用一次）"""
+        if getattr(self, '_broadcast_hotkeys_restored', False):
+            return
+        self._broadcast_hotkeys_restored = True
+        self.hotkeyManager.switch_reg_helper(
+            self.runwindows_swc.value,
+            [keyboard.Key.alt_l, 'u'],
+            self._pages[2].run_win_gbcmd_loj,
+        )
+        self.hotkeyManager.switch_reg_helper(
+            self.KillSCR_swc.value,
+            [keyboard.Key.alt_l, 'k'],
+            self.direct_kill_screen_render,
+        )
+        self.hotkeyManager.switch_reg_helper(
+            self.RunFullSC_swc.value,
+            [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
+            self.direct_run_fullscreen_boradcast_cmd,
+        )
+
     def reflash_ui_bg(self):
-        toolbox_cfg.set_style_path("bgPath", self.bgpath)
+        toolkit_cfg.set_style_path("bgPath", self.bgpath)
         self.loaded_bg = True
         self.col_imgbg = ft.Image(
             src=self.bgpath, height=self.page.window_height,
@@ -308,6 +402,7 @@ class Ui:
 
     def change_bg_btmd(self, e):
         self.bgtmd = e.control.value
+        toolkit_cfg.set_config_key_data(_SETTING_KEYS["bg_opacity"], self.bgtmd)
         self.reflash_ui_bg()
 
     def toggle_system_accent(self, e=None):
@@ -318,17 +413,25 @@ class Ui:
             self.accent_color = get_windows_accent_color()
         else:
             self.accent_color = DEFAULT_ACCENT_COLOR
-        # 刷新当前页面重建控件
-        self.selPages_Helper(int(self.NowSelIndex))
-        # main() 中创建的控件不会随页面重建，需单独更新颜色
-        self.hide_tbox_swc.active_color = self.accent_color
-        self.FastGetSC.active_color = self.accent_color
+        self.update_theme()
         self.page.update()
 
     def toggle_random_yiyan(self, e=None):
         if e:
             self.random_yy_enabled = e.control.value
         self.pick_a_random_yiyan()
+
+    def set_theme_mode(self, e=None):
+        if e:
+            self.theme_mode_key = e.control.value
+        toolkit_cfg.set_config_key_data(_SETTING_KEYS["theme_mode"], self.theme_mode_key)
+        if self.theme_mode_key == "system":
+            self.page.theme_mode = ft.ThemeMode.SYSTEM
+        elif self.theme_mode_key == "light":
+            self.page.theme_mode = ft.ThemeMode.LIGHT
+        else:
+            self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.update()
 
     def pick_a_random_yiyan(self, *e):
         if self.random_yy_enabled:
@@ -346,7 +449,7 @@ class Ui:
         self.page.update()
 
     def from_file_load_yiyan(self):
-        toolbox_cfg.set_style_path("yiyanPath", self.yiyanfpath)
+        toolkit_cfg.set_style_path("yiyanPath", self.yiyanfpath)
         try:
             with open(self.yiyanfpath, "r", encoding="utf-8") as fm:
                 list_get = fm.read().split("^")
@@ -358,7 +461,7 @@ class Ui:
             self.show_snakemessage(f"加载外部一言时出现{e}异常")
 
     def setup_zidingyi_font(self):
-        toolbox_cfg.set_style_path("fontPath", self.zdy_fontpath)
+        toolkit_cfg.set_style_path("fontPath", self.zdy_fontpath)
         self.font_loadtime += 1
         if 10 >= self.font_loadtime > 2:
             old = self.font_loadtime - 1
@@ -368,7 +471,7 @@ class Ui:
             del self.page.fonts[f"zidingyi{old}"]
             self.font_loadtime = 3
         self.page.fonts.update({f"zidingyi{self.font_loadtime}": self.zdy_fontpath})
-        self.page.theme = ft.Theme(font_family=f"zidingyi{self.font_loadtime}")
+        self.update_theme(font_family=f"zidingyi{self.font_loadtime}")
         self.page.update()
         if self.loaded_bg:
             self.reflash_ui_bg()
@@ -413,4 +516,4 @@ class Ui:
             self.page.update()
 
 
-ToolBox = Ui()
+ToolKit = Ui()

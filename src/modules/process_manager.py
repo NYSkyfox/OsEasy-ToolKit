@@ -2,9 +2,11 @@
 # 进程管理工具
 
 import os
+import ctypes
+import struct
+from ctypes import wintypes
 
 import psutil
-import pyautogui
 
 from src.core.helpers import get_time_str
 
@@ -83,33 +85,115 @@ def get_proc_pid(name) -> int | None:
 
 
 def get_scshot() -> None:
-    """保存一张屏幕截图到用户数据目录的 Screenshots/，并复制到剪贴板"""
+    """保存一张屏幕截图到用户数据目录的 Screenshots/，并复制到剪贴板（纯 GDI，零依赖）"""
     from src.core.constants import cmd_file_path
+
+    user32 = ctypes.windll.user32
+    gdi32 = ctypes.windll.gdi32
+    kernel32 = ctypes.windll.kernel32
+
+    # 获取屏幕尺寸
+    SW = user32.GetSystemMetrics(0)   # SM_CXSCREEN
+    SH = user32.GetSystemMetrics(1)   # SM_CYSCREEN
+    print("DEBUG 屏幕尺寸 > ", SW, "x", SH)
+
+    # GDI 截屏
+    hdc_screen = user32.GetDC(0)
+    hdc_mem = gdi32.CreateCompatibleDC(hdc_screen)
+    hbmp = gdi32.CreateCompatibleBitmap(hdc_screen, SW, SH)
+    gdi32.SelectObject(hdc_mem, hbmp)
+    gdi32.BitBlt(hdc_mem, 0, 0, SW, SH, hdc_screen, 0, 0, 0x00CC0020)  # SRCCOPY
+
+    # ---- 保存为 BMP ----
     savepath = os.path.join(cmd_file_path, "..", "Screenshots")
     os.makedirs(savepath, exist_ok=True)
+    mix_name = os.path.join(savepath, get_time_str() + ".bmp")
 
-    PMsize = pyautogui.size()
-    print("DEBUG 屏幕尺寸 > ", PMsize)
+    # 构造 BMP 文件头 + DIB 数据
+    bmp_header_size = 14
+    dib_header_size = 40
+    row_size = ((SW * 24 + 31) // 32) * 4  # 每行对齐到4字节
+    image_size = row_size * SH
+    file_size = bmp_header_size + dib_header_size + image_size
 
-    img = pyautogui.screenshot()
+    bmp_data = bytearray(file_size)
+    # BMP 文件头 (14 bytes)
+    bmp_data[0:2] = b'BM'
+    struct.pack_into('<I', bmp_data, 2, file_size)
+    struct.pack_into('<I', bmp_data, 10, bmp_header_size + dib_header_size)
+    # DIB 头 (40 bytes)
+    struct.pack_into('<I', bmp_data, 14, dib_header_size)
+    struct.pack_into('<i', bmp_data, 18, SW)
+    struct.pack_into('<i', bmp_data, 22, SH)
+    struct.pack_into('<H', bmp_data, 26, 1)       # planes
+    struct.pack_into('<H', bmp_data, 28, 24)       # bits per pixel
+    struct.pack_into('<I', bmp_data, 34, image_size)
 
-    mix_name = os.path.join(savepath, get_time_str() + ".jpg")
-    img.save(mix_name, quality=95, optimize=True)
+    # 读像素到 BMP buffer
+    offset = bmp_header_size + dib_header_size
+    buf = (ctypes.c_ubyte * image_size).from_buffer(bmp_data, offset)
+    gdi32.GetDIBits(hdc_mem, hbmp, 0, SH, buf,
+                    ctypes.byref(_BITMAPINFO(SW, SH)), 0)  # DIB_RGB_COLORS=0
+
+    with open(mix_name, "wb") as f:
+        f.write(bmp_data)
     print("DEBUG SavePath > ", mix_name)
 
-    # 复制到剪贴板
-    try:
-        import io
-        import win32clipboard
-        from PIL import Image
-        output = io.BytesIO()
-        img.convert("RGB").save(output, format="BMP")
-        data = output.getvalue()[14:]  # 去掉 BMP 文件头(14字节)
-        output.close()
-        win32clipboard.OpenClipboard()
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
-        win32clipboard.CloseClipboard()
-        print("DEBUG 截图已复制到剪贴板")
-    except Exception as e:
-        print(f"DEBUG 复制到剪贴板失败: {e}")
+    # ---- 复制到剪贴板 ----
+    # DIB 数据 = 去掉 BMP 文件头的部分
+    dib_data = bytes(bmp_data[bmp_header_size:file_size])
+
+    GMEM_MOVEABLE = 0x0002
+    CF_DIB = 8
+    size = len(dib_data)
+    hmem = kernel32.GlobalAlloc(GMEM_MOVEABLE, size)
+    if hmem:
+        ptr = kernel32.GlobalLock(hmem)
+        buf2 = (ctypes.c_char * size).from_address(ptr)
+        buf2[:] = dib_data
+        kernel32.GlobalUnlock(hmem)
+
+        if user32.OpenClipboard(0):
+            user32.EmptyClipboard()
+            user32.SetClipboardData(CF_DIB, hmem)
+            user32.CloseClipboard()
+            print("DEBUG 截图已复制到剪贴板")
+        else:
+            kernel32.GlobalFree(hmem)
+            print("DEBUG 打开剪贴板失败")
+
+    # 清理
+    gdi32.DeleteObject(hbmp)
+    gdi32.DeleteDC(hdc_mem)
+    user32.ReleaseDC(0, hdc_screen)
+
+
+# ---- GDI 辅助结构 ----
+
+class _BITMAPINFOHEADER(ctypes.Structure):
+    _fields_ = [
+        ("biSize", wintypes.DWORD),
+        ("biWidth", wintypes.LONG),
+        ("biHeight", wintypes.LONG),
+        ("biPlanes", wintypes.WORD),
+        ("biBitCount", wintypes.WORD),
+        ("biCompression", wintypes.DWORD),
+        ("biSizeImage", wintypes.DWORD),
+        ("biXPelsPerMeter", wintypes.LONG),
+        ("biYPelsPerMeter", wintypes.LONG),
+        ("biClrUsed", wintypes.DWORD),
+        ("biClrImportant", wintypes.DWORD),
+    ]
+
+class _BITMAPINFO(ctypes.Structure):
+    _fields_ = [
+        ("bmiHeader", _BITMAPINFOHEADER),
+    ]
+
+    def __init__(self, width, height):
+        super().__init__()
+        self.bmiHeader.biSize = ctypes.sizeof(_BITMAPINFOHEADER)
+        self.bmiHeader.biWidth = width
+        self.bmiHeader.biHeight = height
+        self.bmiHeader.biPlanes = 1
+        self.bmiHeader.biBitCount = 24

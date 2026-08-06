@@ -4,7 +4,7 @@
 import flet as ft
 
 from src.modules.broadcast_handler import (
-    save_now_broadcast_cmd, from_scr_log_cmd_get_yccmd,
+    save_now_broadcast_cmd, extract_yc_cmd_from_log,
     handin_save_yc_cmd, generate_remote_cmd_and_save,
 )
 
@@ -35,7 +35,7 @@ class PageCommands:
         )
         ui.conl_from_log_get_cmd = ft.FilledTonalButton(
             text="从日志文件获取远程命令", icon=ft.icons.BOOK,
-            on_click=lambda _: from_scr_log_cmd_get_yccmd(),
+            on_click=lambda _: extract_yc_cmd_from_log(),
         )
         ui.conl_getyccmd_btn = ft.FilledTonalButton(
             text="读取已拦截的广播命令", icon=ft.icons.BOOK,

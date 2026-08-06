@@ -1,5 +1,5 @@
 # build.py
-# OsEasy-ToolBox 打包脚本（自动下载 UPX + PyInstaller 压缩）
+# ToolKit 打包脚本（自动下载 UPX + PyInstaller 压缩）
 #
 # 使用方法:
 #   1. pip install pyinstaller
@@ -16,9 +16,13 @@ import zipfile
 import urllib.request
 from pathlib import Path
 
+from datetime import datetime
+
+from config import SOURCE_NAME
+
 # ---- 配置 ----
 
-APP_NAME = "OsEasy-ToolBox"
+APP_NAME = SOURCE_NAME
 MAIN_SCRIPT = "main.py"
 ICON_PATH = "logo.ico"              # 根目录下的图标文件
 ONE_FILE = True
@@ -93,21 +97,57 @@ def download_upx():
     raise FileNotFoundError(f"解压后未找到 upx.exe，期望路径: {UPX_EXE}")
 
 def install_dependencies():
-    """从本地 vendor/ 安装依赖，没有就从 PyPI 下载"""
-    print("[依赖] 安装项目依赖...")
+    """安装缺失的项目依赖（已有则跳过）"""
+    print("[依赖] 检查项目依赖...")
     vendor_dir = Path("vendor")
+    use_offline = vendor_dir.exists() and any(vendor_dir.iterdir())
 
-    if vendor_dir.exists() and any(vendor_dir.iterdir()):
+    if use_offline:
         print("[依赖] 使用本地离线包 (vendor/)")
-        cmd = [sys.executable, "-m", "pip", "install", "--no-index", "--find-links", str(vendor_dir), "-r", "requirements.txt"]
     else:
         print("[依赖] 本地离线包不存在，从 PyPI 在线安装")
-        cmd = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
 
-    result = subprocess.run(cmd)
-    if result.returncode != 0:
-        print("❌ 依赖安装失败")
-        sys.exit(result.returncode)
+    # 解析 requirements.txt
+    reqs = []
+    with open("requirements.txt", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                reqs.append(line)
+
+    # 用 pip show 检测已安装（100% 准确，不依赖 importlib.metadata 名称映射）
+    missing = []
+    skipped = []
+    for req in reqs:
+        pkg_name = req.split("==")[0].split(">=")[0].split("<=")[0].split(">")[0].split("<")[0].strip()
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "show", pkg_name],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            skipped.append(pkg_name)
+        else:
+            missing.append(req)
+
+    if skipped:
+        print(f"[依赖] 已安装，跳过: {', '.join(skipped)}")
+
+    if not missing:
+        print("[依赖] 全部已安装，无需下载 ✓")
+        return
+
+    print(f"[依赖] 需要安装: {', '.join(missing)}")
+
+    for req in missing:
+        if use_offline:
+            cmd = [sys.executable, "-m", "pip", "install", "--no-index", "--find-links", str(vendor_dir), req]
+        else:
+            cmd = [sys.executable, "-m", "pip", "install", req]
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            print(f"❌ 依赖安装失败: {req}")
+            sys.exit(result.returncode)
+
     print("[依赖] 安装完成")
 
 
@@ -139,9 +179,21 @@ def build_args():
     # 路径分隔符（Windows 用 ; ）
     flet_datasep = ";" if os.name == "nt" else ":"
 
-    # 收集 flet 资源（--add-data 精确收集，比 --collect-all 小约3~6MB）
-    args.extend(["--add-data", f"venv{os.sep}Lib{os.sep}site-packages{os.sep}flet{flet_datasep}flet"])
-    args.extend(["--add-data", f"venv{os.sep}Lib{os.sep}site-packages{os.sep}flet_desktop{flet_datasep}flet_desktop"])
+    # 自动查找 flet 安装路径（兼容 venv / 系统全局 / pip install --user）
+    import flet as _flet_check
+    flet_path = Path(_flet_check.__path__[0])
+    flet_desktop_path = None
+    try:
+        import flet_desktop as _fd
+        flet_desktop_path = Path(_fd.__path__[0])
+    except ImportError:
+        pass
+
+    # flet 资源
+    if flet_path.exists():
+        args.extend(["--add-data", f"{flet_path}{flet_datasep}flet"])
+    if flet_desktop_path and flet_desktop_path.exists():
+        args.extend(["--add-data", f"{flet_desktop_path}{flet_datasep}flet_desktop"])
     args.extend(["--hidden-import", "flet"])
     args.extend(["--hidden-import", "flet_desktop"])
 
@@ -157,17 +209,11 @@ def build_args():
     if screen_helper.exists():
         args.extend(["--add-data", f"ScreenRender_Helper.exe{os.pathsep}."])
 
-    # resources/gp_net35.exe（神の土豆，如果存在）
-    gp_potato = Path("resources") / "gp_net35.exe"
-    if gp_potato.exists():
-        args.extend(["--add-data", f"resources/gp_net35.exe{os.pathsep}resources"])
-
     # ---- 其他隐藏导入 ----
     extra_hidden = [
         "flet_core", "flet_desktop", "flet_runtime",
         "pynput.keyboard._win32", "pynput.mouse._win32",
-        "httpx", "ctypes.wintypes", "pygetwindow", "psutil", "pyautogui", "webbrowser", "win32clipboard",
-        "pyrect", "pdb", "doctest", "inspect", "traceback",
+        "ctypes.wintypes", "psutil", "webbrowser",
     ]
     for m in extra_hidden:
         args.extend(["--hidden-import", m])
@@ -192,7 +238,11 @@ def build_args():
     upx_path = find_upx()
     if upx_path:
         print(f"[UPX] 找到: {upx_path}")
-        args.extend(["--upx-dir", str(Path(upx_path).parent)])
+        # 如果是本地 tools/ 目录下的 upx，传绝对路径给 PyInstaller
+        # 如果在系统 PATH 里（返回的是 "upx.exe" 这种裸名），不传 --upx-dir
+        upx_path_obj = Path(upx_path)
+        if upx_path_obj.exists():
+            args.extend(["--upx-dir", str(upx_path_obj.resolve().parent)])
     else:
         print("[UPX] 未找到 UPX，跳过压缩（exe 会大一些）")
         print("[UPX] 下载: https://upx.github.io/")
@@ -232,20 +282,29 @@ def main():
     else:
         print(f"  ⚠ ScreenRender_Helper.exe 未找到（运行时需手动放置在工具箱同目录）")
 
-    # gp_net35.exe
-    gp_path = Path("resources") / "gp_net35.exe"
-    if gp_path.exists():
-        print(f"  ✓ resources/gp_net35.exe（将打包进 exe）")
-    else:
-        print(f"  ⚠ resources/gp_net35.exe 未找到（神の土豆功能不可用）")
-
     print()
 
     # ── 安装依赖 ──
     install_dependencies()
 
+    # ── 注入构建日期 ──
+    print("[构建] 写入构建日期到 config.py ...")
+    build_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    config_path = Path("config.py")
+    content = config_path.read_text(encoding="utf-8")
+    content = content.replace('BUILD_DATE = ""', f'BUILD_DATE = "{build_date}"')
+    config_path.write_text(content, encoding="utf-8")
+    print(f"[构建] 构建日期: {build_date}")
+
     # 构建命令
     args = build_args()
+
+    # 删除旧的 .spec 文件（防止残留硬编码路径）
+    spec_file = Path(f"{APP_NAME}.spec")
+    if spec_file.exists():
+        spec_file.unlink()
+        print(f"[清理] 已删除旧 spec: {spec_file}")
+
     cmd = [sys.executable, "-m", "PyInstaller"] + args
     print(f"[执行] pyinstaller {' '.join(args[:5])} ...")
     print()
