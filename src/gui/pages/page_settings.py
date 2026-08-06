@@ -71,7 +71,7 @@ class PageSettings:
 
         return ft.Column(controls=[
             ui.yiyanshowtext, ft.Divider(height=1),
-            ui.hide_tbox_swc,
             ui.theme_dropdown, ui.system_accent_swc, ui.random_yiyan_swc, ui.remove_rem, ui.zitibtn,
             ui.bgfilepick, ui.bgtmd_text, ui.bgtmdb, ui.yiyanbtn,
+            ui.hide_tbox_swc,
         ])
