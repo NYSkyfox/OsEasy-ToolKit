@@ -89,7 +89,7 @@ jobs:
           $appName = "${{ steps.config.outputs.app_name }}"
           $version = "${{ steps.config.outputs.app_version }}"
           $srcExe = "dist\$appName.exe"
-          $hash = (Get-FileHash -Path $srcExe -Algorithm SHA256).Hash.Substring(0, 6).ToLower()
+          $hash = (Get-FileHash -Path $srcExe -Algorithm SHA256).Hash.Substring(0, 7).ToLower()
           $newName = "${appName}_${version}_${hash}.exe"
           Rename-Item -Path $srcExe -NewName $newName
           Write-Host "EXE_NAME=$newName"

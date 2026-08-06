@@ -316,9 +316,23 @@ def main():
         print()
         print(f"✅ 打包完成!")
         print(f"   输出: {dist_path.resolve()}")
-        if dist_path.exists():
-            size_mb = dist_path.stat().st_size / (1024 * 1024)
-            print(f"   大小: {size_mb:.1f} MB")
+
+        # ── 计算 SHA256 并重命名 ──
+        import hashlib
+        from config import APP_VERSION
+        sha256 = hashlib.sha256()
+        with open(dist_path, "rb") as f:
+            while chunk := f.read(8192):
+                sha256.update(chunk)
+        hash_short = sha256.hexdigest()[:7]
+        version_str = APP_VERSION.replace(" ", "_")
+        new_name = f"{APP_NAME}_v{version_str}_{hash_short}.exe"
+        new_path = dist_path.parent / new_name
+        dist_path.rename(new_path)
+        size_mb = new_path.stat().st_size / (1024 * 1024)
+        print(f"   重命名: {new_name}")
+        print(f"   大小: {size_mb:.1f} MB")
+        print(f"   SHA256: {sha256.hexdigest()}")
     else:
         print()
         print("❌ 打包失败，检查上方错误信息")
