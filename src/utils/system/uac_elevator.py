@@ -53,7 +53,7 @@ def _try_bypass_uac(entry_script: str) -> bool:
 
     try:
         current_dir = os.path.abspath(entry_script)
-        cmd = '{} /k {} {}'.format(CMD, sys.executable, current_dir)
+        cmd = '{} /k "{}" "{}"'.format(CMD, sys.executable, current_dir)
         _create_reg_key("DelegateExecute", "")
         _create_reg_key(None, cmd)
         os.system(FOD_HELPER)
