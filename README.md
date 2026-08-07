@@ -111,8 +111,7 @@ OsEasy-ToolKit/
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/NYSkyfox/OsEasy-ToolKit?label=最新版" alt="release">
-  <img src="https://img.shields.io/github/downloads/NYSkyfox/OsEasy-ToolKit/total?label=下载量" alt="downloads">
-  <img src="https://img.shields.io/github/stars/NYSkyfox/OsEasy-ToolKit?style=social" alt="stars">
+  <img src="https://img.shields.io/badge/版本-1.8.0-blue" alt="version">
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="python">
+  <img src="https://img.shields.io/github/stars/NYSkyfox/OsEasy-ToolKit?style=social" alt="stars">
 </p>
