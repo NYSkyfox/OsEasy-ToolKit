@@ -2,7 +2,7 @@
 
 > 🎓 噢易多媒体网络教室工具箱 | 简易的课堂学习辅助工具箱
 
-基于 [ZiHaoSaMa66/OsEasy-ToolBox](https://github.com/ZiHaoSaMa66/OsEasy-ToolBox) 的第三方增强版。
+基于 [ZiHaoSaMa66/OsEasy-ToolBox](https://github.com/ZiHaoSaMa66/OsEasy-ToolBox) 的第三方版。
 
 ---
 
@@ -15,8 +15,8 @@
 | 📺 屏幕广播 | 解除控屏锁定、替换/还原屏幕广播程序 |
 | 🖥️ DLL 管理 | 删除/恢复关键 DLL 文件、删除键盘锁驱动 |
 | ⌨️ 快捷键 | 截图（GDI 纯原生，零依赖）、显示/隐藏工具箱、一言、打开数据目录 |
-| ⚙️ 设置 | 开机自启、快捷键绑定、外观主题、自定义学生端路径 |
-| 🛡️ UAC 提权 | 三级降级：fodhelper → eventvwr → UAC 弹窗 |
+| ⚙️ 设置 | 快捷键绑定、外观主题 |
+| 🛡️ 提权 | 三级降级：fodhelper → eventvwr → UAC 弹窗 |
 
 ---
 
@@ -28,7 +28,7 @@
 
 ### 运行
 
-双击运行，程序会自动请求管理员权限（UAC）。
+双击运行，程序会自动请求管理员权限。
 
 ### 开发
 
