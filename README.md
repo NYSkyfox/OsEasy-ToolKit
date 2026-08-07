@@ -1,4 +1,4 @@
-# OsEasy-ToolKit v1.8.0
+# OsEasy-ToolKit
 
 > 🎓 噢易多媒体网络教室工具箱 | 简易的课堂学习辅助工具箱
 
