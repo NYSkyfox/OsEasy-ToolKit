@@ -102,6 +102,7 @@ class PageOther:
             PersistentSwitch(
                 label="拦截教师端远程重启 (劫持shutdown.exe)",
                 live_getter=is_shutdown_hijacked,
+                verifier=is_shutdown_hijacked,
                 on_toggle=self._on_shutdown_toggle,
             ),
         ])

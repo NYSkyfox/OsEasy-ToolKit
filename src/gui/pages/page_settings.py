@@ -61,6 +61,7 @@ class PageSettings:
         ui.system_accent_swc = PersistentSwitch(
             config_key="follow_system_accent",
             label="系统主题颜色",
+            default_value=True,
             on_toggle=ui.toggle_system_accent,
         )
         ui.bgtmd_text = ft.Text("滑动以调整背景图片不透明度")

@@ -66,7 +66,8 @@ def detect_student_version() -> int:
     不同版本附带不同的可执行文件：
     - v10.9.x → LissHelper.exe
     - v10.8.x → MultiClient.exe
-    - v10.5.x → MouseKeyBoradControl.exe"""
+    - v10.5.x → MouseKeyBoardControl.exe"""
+    from src.utils.system.logger import debug
 
     if not toolkit_cfg.oseasypath_have_been_modified:
         _, _ = detect_student_path()
@@ -79,12 +80,12 @@ def detect_student_version() -> int:
 
     for version, path in versions.items():
         if file_exists(path):
-            print(f"[Student Ver Guess] maybe is v{version // 10}.{version % 10}")
+            debug(f"学生端版本检测: v{version // 10}.{version % 10}")
             toolkit_cfg.student_version = version
             toolkit_cfg.set_config_key_data("studentClientVer", version)
             return toolkit_cfg.student_version
 
-    print("[Student Ver Guess] 超出检测范围 学生端本体可能损坏或路径不正确")
+    debug("学生端版本检测: 超出检测范围或未安装")
     toolkit_cfg.student_version = 0
     return toolkit_cfg.student_version
 
@@ -134,17 +135,6 @@ def check_mmpc_status() -> bool:
         return True
     else:
         return False
-
-
-def run_upto_admin() -> None:
-    """用于在非管理员运行时尝试提权"""
-    import ctypes
-    import sys
-    if ctypes.windll.shell32.IsUserAnAdmin() == 0:
-        ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", sys.executable, "".join(sys.argv), None, 1
-        )
-        sys.exit()
 
 
 def handle_start_student_client(*e) -> None:

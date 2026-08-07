@@ -15,6 +15,8 @@ import os
 import sys
 import ctypes
 
+from src.utils.system.logger import info, warn, error, exception, debug
+
 PYTHON_EXE = sys.executable
 UAC_BYPASS_FLAG_FILE = "__uac_bypass__"            # fodhelper bypass 标记
 UAC_BYPASS_FLAG_EVENTVWR = "__uac_bypass_ev__"     # eventvwr bypass 标记
@@ -59,14 +61,23 @@ def _try_bypass_via_registry(
     原理：系统信任程序（fodhelper/eventvwr）运行时自动提权且不弹 UAC。
     修改注册表指向我们的脚本，触发它执行。
     """
+    exe_name = os.path.basename(exe_path)
+    info(f"尝试 {exe_name} bypass，注册表路径: {reg_path}")
+
     try:
         current_dir = os.path.abspath(entry_script)
         cmd = '"{}" "{}" {}'.format(PYTHON_EXE, current_dir, flag)
+        debug(f"注册表写入 DelegateExecute=''")
         _write_reg_key(reg_path, "DelegateExecute", "")
+        debug(f"注册表写入默认值: {cmd}")
         _write_reg_key(reg_path, None, cmd)
+        info(f"触发 {exe_name}...")
         os.system(exe_path)
+        info(f"{exe_name} bypass 已触发，当前进程退出")
         return True
-    except Exception:
+    except Exception as e:
+        error(f"{exe_name} bypass 异常: {e}")
+        exception()
         return False
 
 
@@ -82,14 +93,17 @@ def _try_bypass_eventvwr(entry_script: str) -> bool:
 
 def _try_uac_dialog() -> None:
     """方案 C：通过 ShellExecuteW(runas) 弹出标准 UAC 提权对话框"""
+    info("回退到 UAC 弹窗提权")
     try:
         argv = " ".join(f'"{a}"' if " " in a else a for a in sys.argv)
         ctypes.windll.shell32.ShellExecuteW(
             None, "runas", sys.executable,
             f"{argv} {UAC_DIALOG_FLAG}", None, 1
         )
-    except Exception:
-        pass
+        info("UAC 弹窗已触发")
+    except Exception as e:
+        error(f"UAC 弹窗失败: {e}")
+        exception()
 
 
 def _set_priv_method() -> None:
@@ -98,12 +112,16 @@ def _set_priv_method() -> None:
         return
     if sys.argv[-1] == UAC_BYPASS_FLAG_FILE:
         os.environ["OSEASY_PRIV_METHOD"] = "bypass_fodhelper"
+        info("提权方式: bypass_fodhelper")
     elif UAC_BYPASS_FLAG_EVENTVWR in sys.argv:
         os.environ["OSEASY_PRIV_METHOD"] = "bypass_eventvwr"
+        info("提权方式: bypass_eventvwr")
     elif UAC_DIALOG_FLAG in sys.argv:
         os.environ["OSEASY_PRIV_METHOD"] = "uac_dialog"
+        info("提权方式: uac_dialog")
     else:
         os.environ["OSEASY_PRIV_METHOD"] = "manifest"
+        info("提权方式: manifest (打包提权/原本就是管理员)")
 
 
 def elevate(entry_script: str) -> None:
@@ -117,21 +135,31 @@ def elevate(entry_script: str) -> None:
 
     :param entry_script: 入口脚本路径（通常传 __file__）
     """
+    info(f"elevate() 调用，入口脚本: {entry_script}")
+
     if is_admin():
+        info("当前已是管理员权限")
         _set_priv_method()
         return
 
+    info("当前非管理员，开始提权流程")
+
     # 防止递归
     if sys.argv[-1] in (UAC_BYPASS_FLAG_FILE, UAC_BYPASS_FLAG_EVENTVWR):
+        info(f"检测到 bypass 标记 '{sys.argv[-1]}'，跳过提权（已由 bypass 拉起）")
         return
 
     # 方案 A：fodhelper 绕过
     if _try_bypass_fodhelper(entry_script):
         sys.exit(0)
 
+    warn("fodhelper bypass 未成功，尝试 eventvwr 备选")
+
     # 方案 B：eventvwr 绕过（备选）
     if _try_bypass_eventvwr(entry_script):
         sys.exit(0)
+
+    warn("eventvwr bypass 也未成功，回退到 UAC 弹窗")
 
     # 方案 C：UAC 弹窗
     _try_uac_dialog()

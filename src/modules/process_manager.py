@@ -33,6 +33,7 @@ class utils:
     @staticmethod
     def suspend_resume_process(process_name, option) -> str | bool:
         """挂起进程"""
+        from src.utils.system.logger import debug as logger_debug
         try:
             for process in psutil.process_iter(["pid", "name"]):
                 if process.info["name"] == process_name:
@@ -41,12 +42,12 @@ class utils:
                     psutil.Process(pid).suspend() if option == "suspend" \
                     else psutil.Process(pid).resume()
 
-                    print(f"Process {process_name} (PID {pid}) {option}.")
+                    logger_debug(f"Process {process_name} (PID {pid}) {option}.")
                     return True
-            print(f"Process {process_name} not found.")
+            logger_debug(f"Process {process_name} not found.")
             return f"尝试{option}的进程未找到"
         except psutil.AccessDenied as e:
-            print(f"Permission error: {e}")
+            logger_debug(f"Permission error: {e}")
             return "尝试挂起进程失败"
 
     @staticmethod
@@ -86,7 +87,8 @@ def get_proc_pid(name) -> int | None:
 
 def get_scshot() -> None:
     """保存一张屏幕截图到用户数据目录的 Screenshots/，并复制到剪贴板（纯 GDI，零依赖）"""
-    from src.core.constants import cmd_file_path
+    from src.core.constants import screenshot_path
+    from src.utils.system.logger import debug
 
     user32 = ctypes.windll.user32
     gdi32 = ctypes.windll.gdi32
@@ -95,18 +97,19 @@ def get_scshot() -> None:
     # 获取屏幕尺寸
     SW = user32.GetSystemMetrics(0)   # SM_CXSCREEN
     SH = user32.GetSystemMetrics(1)   # SM_CYSCREEN
-    print("DEBUG 屏幕尺寸 > ", SW, "x", SH)
+    debug(f"截图开始，屏幕尺寸 {SW}x{SH}")
 
     # GDI 截屏
     hdc_screen = user32.GetDC(0)
     hdc_mem = gdi32.CreateCompatibleDC(hdc_screen)
     hbmp = gdi32.CreateCompatibleBitmap(hdc_screen, SW, SH)
     gdi32.SelectObject(hdc_mem, hbmp)
+    debug("GDI 上下文已创建，执行 BitBlt...")
     gdi32.BitBlt(hdc_mem, 0, 0, SW, SH, hdc_screen, 0, 0, 0x00CC0020)  # SRCCOPY
+    debug("BitBlt 完成")
 
     # ---- 保存为 BMP ----
-    savepath = os.path.join(cmd_file_path, "..", "Screenshots")
-    os.makedirs(savepath, exist_ok=True)
+    savepath = screenshot_path
     mix_name = os.path.join(savepath, get_time_str() + ".bmp")
 
     # 构造 BMP 文件头 + DIB 数据
@@ -132,54 +135,41 @@ def get_scshot() -> None:
     # 读像素到 BMP buffer
     offset = bmp_header_size + dib_header_size
     buf = (ctypes.c_ubyte * image_size).from_buffer(bmp_data, offset)
+    debug("执行 GetDIBits...")
     gdi32.GetDIBits(hdc_mem, hbmp, 0, SH, buf,
                     ctypes.byref(_BITMAPINFO(SW, SH)), 0)  # DIB_RGB_COLORS=0
+    debug("GetDIBits 完成")
 
     with open(mix_name, "wb") as f:
         f.write(bmp_data)
-    print("DEBUG SavePath > ", mix_name)
+    debug(f"BMP 已保存: {mix_name}")
 
     # ---- 复制到剪贴板 ----
-    # DIB 数据 = 去掉 BMP 文件头的部分
-    dib_data = bytes(bmp_data[bmp_header_size:file_size])
-
-    GMEM_MOVEABLE = 0x0002
-    CF_DIB = 8
-    size = len(dib_data)
-    hmem = kernel32.GlobalAlloc(GMEM_MOVEABLE, size)
-    if not hmem:
-        print("DEBUG GlobalAlloc 失败")
-    else:
-        ptr = kernel32.GlobalLock(hmem)
-        buf2 = (ctypes.c_char * size).from_address(ptr)
-        buf2[:] = dib_data
-        kernel32.GlobalUnlock(hmem)
-
-        # 用 GetDesktopWindow() 作为剪贴板所有者，比 NULL 更可靠
-        hwnd = user32.GetDesktopWindow()
-        for attempt in range(5):
-            if user32.OpenClipboard(hwnd):
-                break
-            import time
-            time.sleep(0.01)
-        else:
-            kernel32.GlobalFree(hmem)
-            print("DEBUG 打开剪贴板失败（重试5次后）")
-            hmem = 0  # 标记已释放
-
-        if hmem:
-            user32.EmptyClipboard()
-            if user32.SetClipboardData(CF_DIB, hmem):
-                print("DEBUG 截图已复制到剪贴板")
-            else:
-                kernel32.GlobalFree(hmem)
-                print("DEBUG SetClipboardData 失败")
-            user32.CloseClipboard()
+    # 通过 PowerShell 子进程写入剪贴板，避免管理员模式下 GlobalAlloc/OpenClipboard 死锁
+    debug("通过 PowerShell 写入剪贴板...")
+    try:
+        _clip_ps = (
+            f'Add-Type -AssemblyName System.Windows.Forms;'
+            f'$img = [System.Drawing.Image]::FromFile("{mix_name.replace(chr(92), chr(92)+chr(92))}");'
+            f'[System.Windows.Forms.Clipboard]::SetImage($img);'
+            f'$img.Dispose()'
+        )
+        import subprocess
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", _clip_ps],
+            timeout=10, capture_output=True,
+        )
+        debug("PowerShell 剪贴板写入完成")
+    except subprocess.TimeoutExpired:
+        debug("PowerShell 剪贴板写入超时（10s）")
+    except Exception as _e:
+        debug(f"PowerShell 剪贴板写入失败: {_e}")
 
     # 清理
     gdi32.DeleteObject(hbmp)
     gdi32.DeleteDC(hdc_mem)
     user32.ReleaseDC(0, hdc_screen)
+    debug("截图流程结束，GDI 资源已释放")
 
 
 # ---- GDI 辅助结构 ----

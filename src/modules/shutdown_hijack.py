@@ -26,17 +26,21 @@ def _ensure_fake_shutdown_bat():
 
 def hijack_shutdown():
     """劫持 shutdown.exe，使远程重启命令失效"""
+    from src.utils.system.logger import info
     fake_path = _ensure_fake_shutdown_bat()
     add_ifeo_debugger("shutdown.exe", fake_path)
+    info("已劫持 shutdown.exe，远程重启将被拦截")
     show_snack("已劫持 shutdown.exe，远程重启将被拦截")
 
 
 def release_shutdown_hijack():
     """解除 shutdown.exe 劫持"""
+    from src.utils.system.logger import info
     remove_ifeo_debugger("shutdown.exe")
     fake_path = _get_fake_shutdown_path()
     if os.path.isfile(fake_path):
         os.remove(fake_path)
+    info("已解除 shutdown.exe 劫持")
     show_snack("已解除 shutdown.exe 劫持")
 
 

@@ -14,14 +14,17 @@ from src.modules.killer import ensure_killer_running
 
 def replace_screen_render() -> bool:
     """替换原有scr用于拦截远程命令"""
+    from src.utils.system.logger import info, debug
     filename = "ScreenRender_Helper.exe"
     nowcurhelper = os.path.join(os.getcwd(), filename)
     copypath = os.path.join(toolkit_cfg.oseasy_path, filename)
 
     ensure_killer_running()
     if not file_exists(nowcurhelper):
+        debug("ScreenRender_Helper.exe 不存在，无法替换")
         return False
 
+    info("替换屏幕广播程序 → ScreenRender_Helper")
     run_sigle_cmd(f'rename "{toolkit_cfg.oseasy_path}ScreenRender.exe" "ScreenRender_Y.exe"')
     time.sleep(2.5)
     run_sigle_cmd(f'copy "{nowcurhelper}" "{copypath}"')
@@ -34,6 +37,7 @@ def replace_screen_render() -> bool:
 
 def restone_screen_render() -> bool:
     """还原原有的ScreenRender"""
+    from src.utils.system.logger import info
 
     ensure_killer_running()
     path = f"{toolkit_cfg.oseasy_path}ScreenRender.exe"
@@ -42,6 +46,7 @@ def restone_screen_render() -> bool:
     if a == False:
         return False
 
+    info("还原原有屏幕广播程序")
     try:
         os.remove(path)
     except FileNotFoundError:

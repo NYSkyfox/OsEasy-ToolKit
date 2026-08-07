@@ -50,9 +50,7 @@ class RuntimeConfig:
         if file_exists(self.config_file_path):
             with open(self.config_file_path, "r", encoding="utf-8") as f:
                 return f.read()
-        else:
-            self._write_config_raw({})
-            return "{}"
+        return "{}"
 
     def _write_config_raw(self, datas: dict) -> None:
         """写入配置文件"""

@@ -4,6 +4,7 @@
 import time
 
 import flet as ft
+from pynput import keyboard
 
 from src.core.helpers import run_sigle_cmd
 from src.utils.program.persistent_switch import PersistentSwitch
@@ -76,7 +77,7 @@ class PageBroadcast:
         )
         ui.RunFullSC_btn = ft.FilledTonalButton(
             "长按运行全屏广播命令",
-            on_long_press=lambda _: ui.direct_run_fullscreen_boradcast_cmd(),
+            on_long_press=lambda _: ui.direct_run_fullscreen_broadcast_cmd(),
             icon=ft.icons.FULLSCREEN,
         )
         ui.KillSCR_btn = ft.FilledTonalButton(
@@ -90,16 +91,23 @@ class PageBroadcast:
         ui.runwindows_swc = PersistentSwitch(
             config_key="run_window_broadcast_hotkey",
             label="Alt+U 运行窗口屏幕广播",
+            verifier=lambda: ui.hotkeyManager.is_registered(
+                [keyboard.Key.alt_l, 'u'], self.run_win_gbcmd_loj),
             on_toggle=lambda _: ui._on_run_window_broadcast_changed(),
         )
         ui.KillSCR_swc = PersistentSwitch(
             config_key="kill_screen_render_hotkey",
             label="Alt+K 杀屏幕广播进程",
+            verifier=lambda: ui.hotkeyManager.is_registered(
+                [keyboard.Key.alt_l, 'k'], ui.direct_kill_screen_render),
             on_toggle=lambda _: ui._on_kill_screen_render_changed(),
         )
         ui.RunFullSC_swc = PersistentSwitch(
             config_key="run_fullscreen_broadcast_hotkey",
             label="Ctrl+Alt+F 以全屏运行广播命令",
+            verifier=lambda: ui.hotkeyManager.is_registered(
+                [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
+                ui.direct_run_fullscreen_broadcast_cmd),
             on_toggle=lambda _: ui._on_run_fullscreen_broadcast_changed(),
         )
 

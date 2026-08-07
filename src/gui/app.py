@@ -68,13 +68,13 @@ class Ui:
     #  页面无关的通用回调
     # ============================================================
 
-    def direct_run_fullscreen_boradcast_cmd(self):
+    def direct_run_fullscreen_broadcast_cmd(self):
         status = from_log_file_get_remote_cmd()
         if getattr(self, 'KillSCR_swc', None) is None:
             self.show_snakemessage("请先打开广播管理页再使用此功能")
             return
         if self.KillSCR_swc.value:
-            if status is None:
+            if not status:
                 self.show_snakemessage("未拦截到控制命令参数")
             else:
                 cmd = status.replace("#fullscreen#:0", "#fullscreen#:1")
@@ -112,30 +112,36 @@ class Ui:
         self.hotkeyManager.switch_reg_helper(
             self.hide_tbox_swc.value, [keyboard.Key.caps_lock, keyboard.Key.enter],
             self.hide_toolkit_helper,
+            label="caps+enter 显示/隐藏工具箱",
         )
 
     def _on_fast_screenshot_changed(self):
         self.hotkeyManager.switch_reg_helper(
-            self.FastGetSC.value, [keyboard.Key.alt_l, 'x'], get_scshot,
+            self.FastGetSC.value, [keyboard.Key.alt_l, 'x'],
+            self._scshot_callback,
+            label="Alt+X 截图",
         )
 
     def _on_run_window_broadcast_changed(self):
         self.hotkeyManager.switch_reg_helper(
             self.runwindows_swc.value, [keyboard.Key.alt_l, 'u'],
             self._pages[2].run_win_gbcmd_loj,
+            label="Alt+U 窗口广播",
         )
 
     def _on_kill_screen_render_changed(self):
         self.hotkeyManager.switch_reg_helper(
             self.KillSCR_swc.value, [keyboard.Key.alt_l, 'k'],
             self.direct_kill_screen_render,
+            label="Alt+K 杀广播进程",
         )
 
     def _on_run_fullscreen_broadcast_changed(self):
         self.hotkeyManager.switch_reg_helper(
             self.RunFullSC_swc.value,
             [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
-            self.direct_run_fullscreen_boradcast_cmd,
+            self.direct_run_fullscreen_broadcast_cmd,
+            label="Ctrl+Alt+F 全屏广播",
         )
 
     # ============================================================
@@ -169,12 +175,20 @@ class Ui:
         self.hide_tbox_swc = PersistentSwitch(
             config_key=_SETTING_KEYS["hide_tbox"],
             label="capsLock + enter 隐&显工具箱",
+            default_value=True,
+            verifier=lambda: self.hotkeyManager.is_registered(
+                [keyboard.Key.caps_lock, keyboard.Key.enter], self.hide_toolkit_helper),
             on_toggle=lambda _: self._on_hide_tbox_changed(),
         )
+
+        _screenshot_cb = lambda: self._run_in_thread(get_scshot, "截图")
+        self._scshot_callback = _screenshot_cb
 
         self.FastGetSC = PersistentSwitch(
             config_key=_SETTING_KEYS["fast_screenshot"],
             label="Alt+X 快捷键屏幕截图",
+            verifier=lambda: self.hotkeyManager.is_registered(
+                [keyboard.Key.alt_l, 'x'], _screenshot_cb),
             on_toggle=lambda _: self._on_fast_screenshot_changed(),
         )
 
@@ -322,13 +336,19 @@ class Ui:
 
     def try_restore_settings(self):
         """从配置文件恢复用户设置状态"""
+        from src.utils.system.logger import debug, exception as _log_exc
+        try:
+            self._try_restore_settings_impl()
+        except Exception:
+            _log_exc("恢复设置时出现异常")
+            # 不重新抛出，让 UI 至少能启动
+
+    def _try_restore_settings_impl(self):
         # 主题模式
         saved_theme = toolkit_cfg.get_config_key_data(_SETTING_KEYS["theme_mode"])
         if saved_theme in ("system", "light", "dark"):
             self.theme_mode_key = saved_theme
             self.set_theme_mode()
-            if hasattr(self, "theme_dropdown"):
-                self.theme_dropdown.value = saved_theme
 
         # 系统主题色跟随
         saved_accent = toolkit_cfg.get_config_key_data(_SETTING_KEYS["follow_system_accent"])
@@ -362,9 +382,12 @@ class Ui:
             self.hide_tbox_swc.value,
             [keyboard.Key.caps_lock, keyboard.Key.enter],
             self.hide_toolkit_helper,
+            label="caps+enter 显示/隐藏工具箱",
         )
         self.hotkeyManager.switch_reg_helper(
-            self.FastGetSC.value, [keyboard.Key.alt_l, 'x'], get_scshot,
+            self.FastGetSC.value, [keyboard.Key.alt_l, 'x'],
+            self._scshot_callback,
+            label="Alt+X 截图",
         )
 
         # 广播页的快捷键在 page_broadcast.build() 中恢复（此时控件尚未创建）
@@ -378,16 +401,19 @@ class Ui:
             self.runwindows_swc.value,
             [keyboard.Key.alt_l, 'u'],
             self._pages[2].run_win_gbcmd_loj,
+            label="Alt+U 窗口广播",
         )
         self.hotkeyManager.switch_reg_helper(
             self.KillSCR_swc.value,
             [keyboard.Key.alt_l, 'k'],
             self.direct_kill_screen_render,
+            label="Alt+K 杀广播进程",
         )
         self.hotkeyManager.switch_reg_helper(
             self.RunFullSC_swc.value,
             [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
-            self.direct_run_fullscreen_boradcast_cmd,
+            self.direct_run_fullscreen_broadcast_cmd,
+            label="Ctrl+Alt+F 全屏广播",
         )
 
     def reflash_ui_bg(self):
@@ -462,16 +488,8 @@ class Ui:
 
     def setup_zidingyi_font(self):
         toolkit_cfg.set_style_path("fontPath", self.zdy_fontpath)
-        self.font_loadtime += 1
-        if 10 >= self.font_loadtime > 2:
-            old = self.font_loadtime - 1
-            del self.page.fonts[f"zidingyi{old}"]
-        elif self.font_loadtime > 10:
-            old = self.font_loadtime - 1
-            del self.page.fonts[f"zidingyi{old}"]
-            self.font_loadtime = 3
-        self.page.fonts.update({f"zidingyi{self.font_loadtime}": self.zdy_fontpath})
-        self.update_theme(font_family=f"zidingyi{self.font_loadtime}")
+        self.page.fonts["zidingyi"] = self.zdy_fontpath
+        self.update_theme(font_family="zidingyi")
         self.page.update()
         if self.loaded_bg:
             self.reflash_ui_bg()
@@ -509,6 +527,19 @@ class Ui:
         self.page.snack_bar = ft.SnackBar(ft.Text(showtext))
         self.page.snack_bar.open = True
         self.page.update()
+
+    def _run_in_thread(self, func, label: str = "操作"):
+        """在后台线程执行函数，避免阻塞 UI 或 pynput 回调线程"""
+        import threading
+        from src.utils.system.logger import debug, exception
+        def _wrapper():
+            debug(f"[线程] {label} 开始")
+            try:
+                func()
+            except Exception:
+                exception(f"{label} 异常")
+            debug(f"[线程] {label} 结束")
+        threading.Thread(target=_wrapper, daemon=True).start()
 
     def added_pickdialog(self):
         for idlg in self.list_all_pickdialog:

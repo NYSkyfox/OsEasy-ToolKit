@@ -24,28 +24,39 @@ _killer_protect_pid = None
 def _start_killer_cmd():
     """启动击杀脚本 cmd 窗口，记录其 PID"""
     global _killer_protect_pid
+    from src.utils.system.logger import debug
     batpath = os.path.join(cmd_file_path, KILLER_BAT)
     proc = subprocess.Popen(
         ["cmd.exe", "/c", batpath],
         creationflags=subprocess.CREATE_NEW_CONSOLE,
     )
     _killer_protect_pid = proc.pid
+    debug(f"守护进程已启动 (PID={_killer_protect_pid})")
 
 
 def register_killer_script() -> None:
     """生成击杀脚本并绑定粘滞键"""
+    from src.utils.system.logger import info
+    info("绑定粘滞键劫持 → sethc.exe")
     script_gen.summon_killer()
     add_ifeo_debugger("sethc.exe", os.path.join(cmd_file_path, KILLER_BAT))
 
 
 def del_register_killer() -> None:
     """清理绑定的粘滞键重定向"""
+    from src.utils.system.logger import info
+    info("解除粘滞键劫持")
     remove_ifeo_debugger("sethc.exe")
 
 
 def is_sethc_hijacked() -> bool:
     """检测当前 sethc.exe 是否已被映像劫持"""
     return query_ifeo_debugger("sethc.exe") is not None
+
+
+def is_killer_protected() -> bool:
+    """检测外部cmd守护进程是否正在运行"""
+    return is_protect_killer_script_running
 
 
 def register_killer_v2_cmd() -> None:
@@ -84,12 +95,15 @@ def start_inner_killer_loop() -> None:
 
 
 def killer_script_protect() -> None:
+    from src.utils.system.logger import info
     global is_protect_killer_script_running, _killer_protect_pid
     if not is_protect_killer_script_running:
+        info("启动 cmd 守护进程")
         is_protect_killer_script_running = True
         script_gen.summon_killer()
         threading.Thread(target=start_killer_protect, daemon=True).start()
     else:
+        info("停止 cmd 守护进程")
         is_protect_killer_script_running = False
         if _killer_protect_pid is not None:
             run_sigle_cmd(f"taskkill /f /t /pid {_killer_protect_pid}")

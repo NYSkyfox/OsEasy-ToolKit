@@ -7,7 +7,7 @@ import os
 from src.core.helpers import run_sigle_cmd
 from src.core.runtime_config import toolkit_cfg
 from src.modules.killer import (
-    launch_oe_toolkit, is_sethc_hijacked,
+    launch_oe_toolkit, is_sethc_hijacked, is_killer_protected,
 )
 from src.modules.service_manager import check_mmpc_status, handle_start_student_client
 from src.utils.program.persistent_switch import PersistentSwitch
@@ -42,11 +42,13 @@ class PageProcess:
         ui.protect_swc = PersistentSwitch(
             config_key="protect_killer_enabled",
             label="外部cmd守护进程",
+            verifier=is_killer_protected,
             on_toggle=ui._on_protect_killer_changed,
         )
 
         ui.sethc_swc = PersistentSwitch(
             live_getter=is_sethc_hijacked,
+            verifier=is_sethc_hijacked,
             label="劫持粘滞键 (sethc.exe)",
             on_toggle=ui._on_sethc_toggle,
         )

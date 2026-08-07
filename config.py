@@ -19,13 +19,19 @@ DEFAULT_FONT_PATH = "C:\\Windows\\Fonts\\msyh.ttc"
 DATA_ROOT_TEMPLATE = "C:\\Users\\{username}\\OsEasy-ToolKit"
 
 # 配置文件路径
-CONFIG_FILE_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\Config.json"
+CONFIG_FILE_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\config.json"
 
 # 备份文件路径
-BACKUP_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\Backups"
+BACKUP_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\backups"
 
 # 生成的脚本文件夹路径
-CMD_FILE_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\Scripts"
+CMD_FILE_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\scripts"
+
+# 日志文件夹路径
+LOG_DIR_TEMPLATE = DATA_ROOT_TEMPLATE + "\\log"
+
+# 截图保存路径
+SCREENSHOT_PATH_TEMPLATE = DATA_ROOT_TEMPLATE + "\\screenshots"
 
 # 默认学生端路径
 DEFAULT_OSEASY_PATH = "C:\\Program Files (x86)\\Os-Easy\\os-easy multicast teaching system\\"
