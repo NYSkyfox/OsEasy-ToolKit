@@ -2,7 +2,7 @@
 
 > 🎓 噢易多媒体网络教室工具箱 | 简易的课堂学习辅助工具箱
 
-基于 [ZiHaoSaMa66/OsEasy-ToolBox](https://github.com/ZiHaoSaMa66/OsEasy-ToolBox) 的第三方版。
+基于 [ZiHaoSaMa66/OsEasy-ToolBox](https://github.com/ZiHaoSaMa66/OsEasy-ToolBox) 的第三方增强版。
 
 ---
 
@@ -11,11 +11,11 @@
 | 模块 | 功能 |
 |---|---|
 | 🔪 进程管理 | 击杀学生端进程、循环守护、粘滞键劫持 |
-| 🌐 解除管控 | 停止网络管控服务、关闭 USB 管控服务 |
+| 🌐 网络管控 | 停止网络管控服务、关闭 USB 管控服务 |
 | 📺 屏幕广播 | 解除控屏锁定、替换/还原屏幕广播程序 |
 | 🖥️ DLL 管理 | 删除/恢复关键 DLL 文件、删除键盘锁驱动 |
 | ⌨️ 快捷键 | 截图（GDI 纯原生，零依赖）、显示/隐藏工具箱、一言、打开数据目录 |
-| ⚙️ 设置 | 快捷键绑定、外观主题、自定义学生端路径 |
+| ⚙️ 设置 | 开机自启、快捷键绑定、外观主题、自定义学生端路径 |
 | 🛡️ UAC 提权 | 三级降级：fodhelper → eventvwr → UAC 弹窗 |
 
 ---
@@ -28,7 +28,7 @@
 
 ### 运行
 
-运行时程序会自动请求管理员权限
+双击运行，程序会自动请求管理员权限（UAC）。
 
 ### 开发
 
@@ -107,3 +107,12 @@ OsEasy-ToolKit/
 ## 📄 开源协议
 
 [MIT License](https://github.com/ZiHaoSaMa66/OsEasy-ToolBox) — 继承自上游项目。
+
+---
+
+<p align="center">
+  <img src="https://img.shields.io/github/v/release/NYSkyfox/OsEasy-ToolKit?label=最新版" alt="release">
+  <img src="https://img.shields.io/github/downloads/NYSkyfox/OsEasy-ToolKit/total?label=下载量" alt="downloads">
+  <img src="https://img.shields.io/github/stars/NYSkyfox/OsEasy-ToolKit?style=social" alt="stars">
+  <img src="https://img.shields.io/badge/python-3.10+-blue" alt="python">
+</p>
