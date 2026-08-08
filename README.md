@@ -111,7 +111,7 @@ OsEasy-ToolKit/
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/badge/版本-1.8.0-blue" alt="version">
+  <img src="https://img.shields.io/badge/版本-1.8.1_Alpha-blue" alt="version">
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="python">
   <img src="https://img.shields.io/github/stars/NYSkyfox/OsEasy-ToolKit?color=blue" alt="stars">
 </p>
