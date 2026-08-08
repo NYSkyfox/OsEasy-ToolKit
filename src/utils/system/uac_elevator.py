@@ -50,6 +50,38 @@ def _write_reg_key(reg_path: str, key: str, value: str) -> None:
     winreg.CloseKey(registry_key)
 
 
+def _delete_reg_value(reg_path: str, key) -> None:
+    """删除注册表键值（key=None 表示默认值）"""
+    import winreg
+    try:
+        registry_key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE
+        )
+        winreg.DeleteValue(registry_key, key)
+        winreg.CloseKey(registry_key)
+        debug(f"已删除注册表键值: {reg_path}\\{key or '(默认)'}")
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        debug(f"删除注册表键值失败: {reg_path}\\{key or '(默认)'}: {e}")
+
+
+def _cleanup_bypass_registry() -> None:
+    """清理 bypass 提权留下的注册表劫持，恢复系统正常行为。
+
+    fodhelper bypass 修改了 ms-settings\\shell\\open\\command，
+    eventvwr bypass 修改了 mscfile\\shell\\open\\command。
+    不清理会导致右键"个性化/显示设置"等操作被劫持到本程序。
+    """
+    for name, reg_path in [("fodhelper", FOD_REG_PATH), ("eventvwr", EVENTVWR_REG_PATH)]:
+        try:
+            _delete_reg_value(reg_path, "DelegateExecute")
+            _delete_reg_value(reg_path, None)  # 默认值
+            info(f"已清理 {name} bypass 注册表残留")
+        except Exception as e:
+            debug(f"清理 {name} 注册表时异常: {e}")
+
+
 def _try_bypass_via_registry(
     reg_path: str,
     exe_path: str,
@@ -147,6 +179,8 @@ def elevate(entry_script: str) -> None:
     # 防止递归
     if sys.argv[-1] in (UAC_BYPASS_FLAG_FILE, UAC_BYPASS_FLAG_EVENTVWR):
         info(f"检测到 bypass 标记 '{sys.argv[-1]}'，跳过提权（已由 bypass 拉起）")
+        # 提权成功后立即清理注册表劫持，否则右键"个性化/显示设置"等操作会被劫持到本程序
+        _cleanup_bypass_registry()
         return
 
     # 方案 A：fodhelper 绕过
