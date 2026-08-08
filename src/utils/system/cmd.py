@@ -11,7 +11,7 @@ import subprocess
 
 from src.core.constants import cmd_file_path
 
-# ── PowerShell 统一控制台颜色设置（灰白色，不出现红字吓人） ──
+# ── PowerShell 统一控制台颜色设置-灰白色
 _PS_COLOR_SETUP = (
     "$Host.PrivateData.ErrorForegroundColor = 'Gray'; "
     "$Host.PrivateData.ErrorBackgroundColor = $Host.UI.RawUI.BackgroundColor; "
