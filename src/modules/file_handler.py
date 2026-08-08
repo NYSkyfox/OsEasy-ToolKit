@@ -15,7 +15,6 @@ def backup_oe_files() -> None:
     print("[INFO] 尝试备份关键文件")
     namelist = [
         "MultiClient.exe",
-        "MultiClient.exe",
         "LoadDriver.exe",
         "BlackSlient.exe",
         "\\x86\\LISSNetInfoSniffer.exe",

@@ -26,17 +26,45 @@ class script_gen:
     def summon_unlock_usb() -> None:
         """生成解锁USB脚本"""
         mp = cmd_file_path + "\\" + UNLOCK_USB_BAT
-        cmdtext = f"""@ECHO OFF\n
-        title {SOURCE_NAME}-UnlockUSBHeler\n
+        cmdtext = f"""@ECHO OFF
+title {SOURCE_NAME}-UnlockUSB
 
-        sc delete easyusbflt\n
-        sc delete easyusbflt\n
-        timeout 1\n
-        
-        del C:\\Windows\\System32\\drivers\\easyusbflt.sys\n
-        timeout 5\n
-        shutdown /l
-        """
+{get_mmpc_cmd(True)}
+taskkill /f /t /im {toolkit_cfg.student_exe_name}
+taskkill /f /t /im DeviceControl_x64.exe
+
+sc stop easyusbflt
+sc delete easyusbflt
+
+del /f /q C:\\Windows\\System32\\drivers\\easyusbflt.sys
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+"{{" ^
+"    $target = 'easyusbflt';" ^
+"    $guids = @('{{36FC9E60-C465-11CF-8056-444553540000}}','{{745a17a0-74d3-11d0-b6fe-00a0c90f57da}}');" ^
+"    foreach ($guid in $guids) {{" ^
+"        $path = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\' + $guid;" ^
+"        foreach ($name in @('UpperFilters','LowerFilters')) {{" ^
+"            $v = Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue;" ^
+"            if ($v -and $v.$name -contains $target) {{" ^
+"                $new = $v.$name | Where-Object {{ $_ -ne $target }};" ^
+"                if ($new) {{" ^
+"                    Set-ItemProperty -Path $path -Name $name -Value $new;" ^
+"                    Write-Host ('[OK] ' + $guid + ' ' + $name + ': removed ' + $target + ', left: ' + ($new -join ','));" ^
+"                }} else {{" ^
+"                    Remove-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue;" ^
+"                    Write-Host ('[OK] ' + $guid + ' ' + $name + ': removed ' + $target + ' (deleted empty value)');" ^
+"                }}" ^
+"            }}" ^
+"        }}" ^
+"    }}" ^
+"}}"
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+"Get-PnpDevice -Class HIDClass -ErrorAction SilentlyContinue | Restart-PnpDevice -ErrorAction SilentlyContinue"
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+"Get-PnpDevice -Class USB -ErrorAction SilentlyContinue | Restart-PnpDevice -ErrorAction SilentlyContinue"
+"""
         with open(mp, "w") as f:
             f.write(cmdtext)
 
@@ -44,7 +72,7 @@ class script_gen:
     def summon_killer_v2() -> None:
         """生成V2击杀脚本"""
         mp = cmd_file_path + "\\" + KILLER_V2_BAT
-        cmdtext = f"@ECHO OFF\ntitle {SOURCE_NAME}-KillerV2\n:awa\nfor %%p in (Ctsc_Multi.exe,DeviceControl_x64.exe,HRMon.exe,MultiClient.exe,OActiveII-Client.exe,OEClient.exe,OELogSystem.exe,OEUpdate.exe,OEProtect.exe,ProcessProtect.exe,RunClient.exe,RunClient.exe,ServerOSS.exe,{toolkit_cfg.student_exe_name},wfilesvr.exe,tvnserver.exe,updatefilesvr.exe,ScreenRender.exe) do taskkill /f /IM %%p\ngoto awa\n"
+        cmdtext = f"@ECHO OFF\ntitle {SOURCE_NAME}-KillerV2\n:awa\nfor %%p in (Ctsc_Multi.exe,DeviceControl_x64.exe,HRMon.exe,MultiClient.exe,OActiveII-Client.exe,OEClient.exe,OELogSystem.exe,OEUpdate.exe,OEProtect.exe,ProcessProtect.exe,RunClient.exe,ServerOSS.exe,{toolkit_cfg.student_exe_name},wfilesvr.exe,tvnserver.exe,updatefilesvr.exe,ScreenRender.exe) do taskkill /f /IM %%p\ngoto awa\n"
         with open(mp, "w") as f:
             f.write(cmdtext)
 
@@ -57,7 +85,6 @@ class script_gen:
         
         {get_mmpc_cmd(True)}
 
-        taskkill /f /t /im MultiClient.exe\n
         taskkill /f /t /im MultiClient.exe\n
         taskkill /f /t /im BlackSlient.exe\n
         :a\n
@@ -73,7 +100,7 @@ class script_gen:
         backup_oe_files()
 
         mp = cmd_file_path + "\\" + HELPER_BAT
-        cmdtext = f"@ECHO OFF\ntitle {SOURCE_NAME}-Helper\ncd /D {toolkit_cfg.oseasy_path}\ntimeout 1\ndel /F /S LockKeyboard.dll\ndel /F /S LoadDriver.exe\ndel /F /S LoadDriver.exe\ndel /F /S oenetlimitx64.cat\ndel /F /S BlackSlient.exe\ncd x86\ndel /F /S LISSNetInfoSniffer.exe\ncd .."
+        cmdtext = f"@ECHO OFF\ntitle {SOURCE_NAME}-Helper\ncd /D {toolkit_cfg.oseasy_path}\ntimeout 1\ndel /F /S LockKeyboard.dll\ndel /F /S LoadDriver.exe\ndel /F /S oenetlimitx64.cat\ndel /F /S BlackSlient.exe\ncd x86\ndel /F /S LISSNetInfoSniffer.exe\ncd .."
         if delMtc == True:
             cmdtext += "\ndel /F /S MultiClient.exe"
         if shutdown == False:

@@ -16,10 +16,7 @@ def usb_unlock():
     from src.utils.system.logger import info
     info("开始 USB 解锁流程")
     show_snack("尝试关闭USB服务... 请稍等")
-    script_gen.summon_unlocknet()
     script_gen.summon_unlock_usb()
-    runbat(UNLOCK_NET_BAT)
-    time.sleep(2)
     runbat(UNLOCK_USB_BAT)
     info("USB 解锁脚本已执行")
 

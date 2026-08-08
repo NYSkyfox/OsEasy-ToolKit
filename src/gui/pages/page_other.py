@@ -97,7 +97,7 @@ class PageOther:
             ft.FilledTonalButton(text="长按以恢复黑屏安静程序", icon=ft.icons.ACCOUNT_BOX, on_long_press=lambda _: restore_oe_file("BlackSlient.exe")),
             ft.FilledTonalButton(text="长按以仅恢复控屏锁定程序", icon=ft.icons.SCREEN_SHARE_SHARP, on_long_press=lambda _: restore_oe_file("MultiClient.exe")),
             ft.FilledTonalButton(text="停止网络管控服务(不可逆)", icon=ft.icons.WIFI_PASSWORD_SHARP, on_click=lambda _: unlock_network()),
-            ft.FilledTonalButton(text="[无法正常工作] 关闭USB管控服务", icon=ft.icons.USB_SHARP, on_click=lambda _: usb_unlock()),
+            ft.FilledTonalButton(text="关闭USB管控服务（测试，不保证可用）", icon=ft.icons.USB_SHARP, on_click=lambda _: usb_unlock()),
             ui.FastGetSC,
             PersistentSwitch(
                 label="拦截教师端远程重启 (劫持shutdown.exe)",
