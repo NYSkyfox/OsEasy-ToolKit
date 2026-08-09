@@ -65,6 +65,19 @@ try:
     from src.utils.system.logger import init
     init(os.path.dirname(toolkit_cfg.config_file_path))
 
+    # ── AUMID 自愈注册：确保 Toast 通知来源显示为 OsEasy-ToolKit（失败不影响启动） ──
+    try:
+        from src.utils.system.aumid import register_aumid
+        _tk_root = os.path.dirname(os.path.abspath(__file__))
+        register_aumid(
+            app_id="OsEasy-ToolKit",
+            args=f'"{os.path.join(_tk_root, "main.py")}"',
+            workdir=_tk_root,
+            icon=os.path.join(_tk_root, "logo.ico"),
+        )
+    except Exception:
+        _log_exception("AUMID 注册失败（忽略，不影响启动）")
+
     # 首次启动时的特殊操作
     fstst = toolkit_cfg.first_launch_check()
     if fstst == True:
