@@ -12,15 +12,15 @@
 
 | 页面 | 功能 |
 |---|---|
-| 🔧 进程管理 | 击杀/挂起学生端进程、cmd 外部守护进程、粘滞键劫持、删除键盘锁驱动、根服务(MmPc)启停 |
+| 🔧 进程管理 | 击杀/挂起学生端进程、cmd 外部守护进程、粘滞键劫持、删除键盘锁驱动、根服务(MMPC)启停 |
 | 📦 其他管理 | USB/网络管控解锁、DLL 文件恢复、关机劫持（解除强制关机）、自身脚本清理 |
 | 📺 广播管理 | 替换/恢复屏幕广播拦截程序、窗口化或全屏运行广播命令、杀广播进程(ScreenRender) |
 | 🔑 广播命令 | 由教师机 IP 生成远程命令、手动编辑/自动替换 IP 更新命令、从日志文件提取拦截的命令 |
 | 🖥️ DLL 工具 | USB/网络管控实时状态查询、删除/恢复关键 DLL、删除键盘锁驱动 |
 | ⚙️ 设置 | 主题模式（浅色/深色/跟随系统）、系统主题色、背景图片/字体/一言、快捷键开关 |
-| ℹ️ 关于 | 版本信息、GitHub 仓库入口、当前提权方式（fodhelper / eventvwr / UAC / manifest） |
+| ℹ️ 关于 | 版本信息、GitHub 仓库入口、当前提权方式(fodhelper / eventvwr / UAC / manifest) |
 
-> 🛡️ **UAC 提权**：启动时自动三级降级尝试 — fodhelper 注册表绕过（静默）→ eventvwr 备选绕过 → 标准 UAC 弹窗。提权后自动清理注册表劫持，不影响系统正常行为。
+> 🛡️ **UAC 提权**：启动时自动三级降级尝试 — fodhelper 注册表绕过（静默）→ eventvwr 备选绕过 → 标准 UAC 弹窗。
 
 ---
 
@@ -28,7 +28,7 @@
 
 ### 下载
 
-从 [Releases](https://github.com/NYSkyfox/OsEasy-ToolKit/releases) 下载最新 `ToolKit_v*.exe`。
+从 [Releases](https://github.com/NYSkyfox/OsEasy-ToolKit/releases) 下载最新 `OsEasyToolKit`。
 
 ### 运行
 
@@ -115,7 +115,7 @@ OsEasy-ToolKit/
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/badge/版本-1.8.0-blue" alt="version">
-  <img src="https://img.shields.io/badge/python-3.10+-blue" alt="python">
-  <img src="https://img.shields.io/github/stars/NYSkyfox/OsEasy-ToolKit?color=blue" alt="stars">
+  <img src="https://img.shields.io/badge/版本-1.8.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
+  <img src="https://img.shields.io/github/stars/NYSkyfox/OsEasy-ToolKit?color=blue" alt="Stars">
 </p>
