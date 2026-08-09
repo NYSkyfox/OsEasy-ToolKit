@@ -42,28 +42,50 @@ def is_admin() -> bool:
 def _write_reg_key(reg_path: str, key: str, value: str) -> None:
     """创建/写入注册表键值"""
     import winreg
+    value_name = "" if key in (None, "") else key
     winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
     registry_key = winreg.OpenKey(
         winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE
     )
-    winreg.SetValueEx(registry_key, key, 0, winreg.REG_SZ, value)
+    winreg.SetValueEx(registry_key, value_name, 0, winreg.REG_SZ, value)
     winreg.CloseKey(registry_key)
 
 
 def _delete_reg_value(reg_path: str, key) -> None:
-    """删除注册表键值（key=None 表示默认值）"""
+    """删除注册表键值（key=None 或空字符串表示默认值）"""
     import winreg
+    value_name = "" if key in (None, "") else key
     try:
         registry_key = winreg.OpenKey(
             winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE
         )
-        winreg.DeleteValue(registry_key, key)
+        winreg.DeleteValue(registry_key, value_name)
         winreg.CloseKey(registry_key)
-        debug(f"已删除注册表键值: {reg_path}\\{key or '(默认)'}")
+        debug(f"已删除注册表键值: {reg_path}\\{value_name or '(默认)'}")
     except FileNotFoundError:
         pass
     except Exception as e:
-        debug(f"删除注册表键值失败: {reg_path}\\{key or '(默认)'}: {e}")
+        debug(f"删除注册表键值失败: {reg_path}\\{value_name or '(默认)'}: {e}")
+
+
+def _delete_reg_key_if_empty(reg_path: str) -> None:
+    """若注册表键为空，则删除该键。"""
+    import winreg
+    try:
+        registry_key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_READ
+        )
+        num_subkeys, num_values, _ = winreg.QueryInfoKey(registry_key)
+        winreg.CloseKey(registry_key)
+        if num_subkeys == 0 and num_values == 0:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path)
+            debug(f"已删除空注册表键: {reg_path}")
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        debug(f"未删除注册表键 {reg_path}，因为键非空或受保护: {e}")
+    except Exception as e:
+        debug(f"尝试删除注册表键 {reg_path} 时失败: {e}")
 
 
 def _cleanup_bypass_registry() -> None:
@@ -76,7 +98,8 @@ def _cleanup_bypass_registry() -> None:
     for name, reg_path in [("fodhelper", FOD_REG_PATH), ("eventvwr", EVENTVWR_REG_PATH)]:
         try:
             _delete_reg_value(reg_path, "DelegateExecute")
-            _delete_reg_value(reg_path, None)  # 默认值
+            _delete_reg_value(reg_path, "")  # 默认值
+            _delete_reg_key_if_empty(reg_path)
             info(f"已清理 {name} bypass 注册表残留")
         except Exception as e:
             debug(f"清理 {name} 注册表时异常: {e}")
@@ -169,6 +192,10 @@ def elevate(entry_script: str) -> None:
     """
     info(f"elevate() 调用，入口脚本: {entry_script}")
 
+    # 启动时统一清理可能的旧 bypass 注册表残留。
+    # 无论是否已获得管理员权限，都要恢复 ms-settings / mscfile 的正常行为。
+    _cleanup_bypass_registry()
+
     if is_admin():
         info("当前已是管理员权限")
         _set_priv_method()
@@ -176,11 +203,9 @@ def elevate(entry_script: str) -> None:
 
     info("当前非管理员，开始提权流程")
 
-    # 防止递归
+    # 防止递归：如果当前进程是由 bypass 标记启动的，说明提权已经完成。
     if sys.argv[-1] in (UAC_BYPASS_FLAG_FILE, UAC_BYPASS_FLAG_EVENTVWR):
         info(f"检测到 bypass 标记 '{sys.argv[-1]}'，跳过提权（已由 bypass 拉起）")
-        # 提权成功后立即清理注册表劫持，否则右键"个性化/显示设置"等操作会被劫持到本程序
-        _cleanup_bypass_registry()
         return
 
     # 方案 A：fodhelper 绕过

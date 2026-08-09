@@ -1,3 +1,4 @@
 flet-desktop==0.25.0
 pynput
 psutil
+winotify
