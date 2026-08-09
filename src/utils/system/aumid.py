@@ -7,7 +7,7 @@ import sys
 import ctypes
 from ctypes import (
     Structure, POINTER, byref, c_void_p, c_ulong, c_ushort, c_ubyte,
-    c_long, c_wchar_p, c_int, c_uint, cast, CFUNCTYPE, create_unicode_buffer,
+    c_long, c_wchar_p, c_int, cast, CFUNCTYPE, create_unicode_buffer,
 )
 
 _ole32 = ctypes.windll.ole32
