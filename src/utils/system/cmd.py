@@ -109,9 +109,15 @@ def runbat(batname: str) -> None:
     lines.append("echo ==============================")
     lines.append("echo 按任意键关闭此窗口...")
     lines.append("pause >nul")
-    lines.append("del /f /q \"%~f0\" >nul 2>&1")
+    # 自删除交给后台进程延迟执行：直接 del "%~f0" 会让 cmd 在文件被删后继续读下一行，
+    # 报“找不到批处理文件”；后台删除 + exit 则可避免该错误，且窗口关闭后仍能删掉文件
+    lines.append('start "" /b cmd /c "ping -n 2 127.0.0.1 >nul & del /f /q "%~f0" >nul 2>&1"')
+    lines.append("exit /b 0")
 
-    with open(wrapper_path, "w", encoding="utf-8", newline="\r\n") as f:
+    # 注意：cmd 读取 .bat 按系统 OEM 代码页（中文系统 = GBK/cp936），
+    # 因此必须用 GBK 写入，否则中文 echo（如“按任意键关闭此窗口...”）会乱码
+    # newline=""：内容已用 \r\n 拼接，避免 open 再翻译产生 \r\r\n
+    with open(wrapper_path, "w", encoding="gbk", newline="") as f:
         f.write("\r\n".join(lines) + "\r\n")
 
     cmdline = f'start "" "{wrapper_path}"'

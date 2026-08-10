@@ -1,7 +1,7 @@
 # src/modules/script_generator.py
 # 脚本生成器
 
-from config import SOURCE_NAME, KILLER_BAT, KILLER_V2_BAT, HELPER_BAT, UNLOCK_NET_BAT, UNLOCK_USB_BAT
+from config import SOURCE_NAME, KILLER_BAT, KILLER_V2_BAT, HELPER_BAT, UNLOCK_NET_BAT, UNLOCK_USB_BAT, UNLOCK_USB_PS1
 from src.core.constants import cmd_file_path
 from src.core.runtime_config import toolkit_cfg
 from src.modules.service_manager import get_mmpc_cmd
@@ -25,6 +25,39 @@ class script_gen:
     @staticmethod
     def summon_unlock_usb() -> None:
         """生成解锁USB脚本"""
+        # 独立的 PowerShell 脚本：注册表过滤驱动清理 + 设备重启
+        # （避免在 bat 内用多行 ^ 续行 + 引号导致的解析错误）
+        ps1 = cmd_file_path + "\\" + UNLOCK_USB_PS1
+        pstext = f"""$target = 'easyusbflt'
+$guids = @('{{36FC9E60-C465-11CF-8056-444553540000}}','{{745a17a0-74d3-11d0-b6fe-00a0c90f57da}}')
+foreach ($guid in $guids) {{
+    $path = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\' + $guid
+    foreach ($name in @('UpperFilters','LowerFilters')) {{
+        $v = Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue
+        if ($v -and $v.$name -contains $target) {{
+            $new = $v.$name | Where-Object {{ $_ -ne $target }}
+            if ($new) {{
+                Set-ItemProperty -Path $path -Name $name -Value $new
+                Write-Host ('[OK] ' + $guid + ' ' + $name + ': removed ' + $target + ', left: ' + ($new -join ','))
+            }} else {{
+                Remove-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue
+                Write-Host ('[OK] ' + $guid + ' ' + $name + ': removed ' + $target + ' (deleted empty value)')
+            }}
+        }}
+    }}
+}}
+Get-PnpDevice -Class HIDClass -ErrorAction SilentlyContinue | ForEach-Object {{
+    Disable-PnpDevice -InstanceId $_.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
+    Enable-PnpDevice -InstanceId $_.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
+}}
+Get-PnpDevice -Class USB -ErrorAction SilentlyContinue | ForEach-Object {{
+    Disable-PnpDevice -InstanceId $_.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
+    Enable-PnpDevice -InstanceId $_.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
+}}
+"""
+        with open(ps1, "w", encoding="utf-8") as f:
+            f.write(pstext)
+
         mp = cmd_file_path + "\\" + UNLOCK_USB_BAT
         cmdtext = f"""@ECHO OFF
 title {SOURCE_NAME}-UnlockUSB
@@ -36,34 +69,11 @@ taskkill /f /t /im DeviceControl_x64.exe
 sc stop easyusbflt
 sc delete easyusbflt
 
-del /f /q C:\\Windows\\System32\\drivers\\easyusbflt.sys
+del /f /q "{toolkit_cfg.oseasy_path}easyusbflt.sys"
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-"{{" ^
-"    $target = 'easyusbflt';" ^
-"    $guids = @('{{36FC9E60-C465-11CF-8056-444553540000}}','{{745a17a0-74d3-11d0-b6fe-00a0c90f57da}}');" ^
-"    foreach ($guid in $guids) {{" ^
-"        $path = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\' + $guid;" ^
-"        foreach ($name in @('UpperFilters','LowerFilters')) {{" ^
-"            $v = Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue;" ^
-"            if ($v -and $v.$name -contains $target) {{" ^
-"                $new = $v.$name | Where-Object {{ $_ -ne $target }};" ^
-"                if ($new) {{" ^
-"                    Set-ItemProperty -Path $path -Name $name -Value $new;" ^
-"                    Write-Host ('[OK] ' + $guid + ' ' + $name + ': removed ' + $target + ', left: ' + ($new -join ','));" ^
-"                }} else {{" ^
-"                    Remove-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue;" ^
-"                    Write-Host ('[OK] ' + $guid + ' ' + $name + ': removed ' + $target + ' (deleted empty value)');" ^
-"                }}" ^
-"            }}" ^
-"        }}" ^
-"    }}" ^
-"}}"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0{UNLOCK_USB_PS1}"
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-"Get-PnpDevice -Class HIDClass -ErrorAction SilentlyContinue | Restart-PnpDevice -ErrorAction SilentlyContinue"
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-"Get-PnpDevice -Class USB -ErrorAction SilentlyContinue | Restart-PnpDevice -ErrorAction SilentlyContinue"
+shutdown /l
 """
         with open(mp, "w") as f:
             f.write(cmdtext)
