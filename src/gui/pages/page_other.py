@@ -3,13 +3,9 @@
 
 import flet as ft
 
-from src.modules.file_handler import (
-    restore_oe_key_dlls, restore_oe_file,
-    del_self_cmd_files,
-)
-from src.modules.usb_network_unlock import usb_unlock, unlock_network
-from src.modules.shutdown_hijack import hijack_shutdown, release_shutdown_hijack, is_shutdown_hijacked, is_shutdown_hijacked_by_others
-from src.modules.killer import delete_locked_and_logout
+from src.modules.file_handler import del_self_cmd_files
+from src.modules.power_control import hijack_shutdown, release_shutdown_hijack, is_shutdown_hijacked, is_shutdown_hijacked_by_others
+from src.modules.power_control import hijack_student_restart, release_student_hijack, is_student_hijacked
 from src.utils.program.persistent_switch import PersistentSwitch
 
 
@@ -17,23 +13,6 @@ class PageOther:
 
     def __init__(self, ui):
         self.ui = ui
-
-    # ---- 解锁对话框（本页专属） ----
-
-    def _close_unlock_dlg(self, xueze):
-        ui = self.ui
-        self._unlock_dlg.open = False
-        ui.page.update()
-        if xueze is None:
-            ui.show_snakemessage("取消解锁了")
-        else:
-            delete_locked_and_logout(xueze)
-
-    def _open_unlock_dlg(self, *e):
-        ui = self.ui
-        ui.page.dialog = self._unlock_dlg
-        self._unlock_dlg.open = True
-        ui.page.update()
 
     # ---- shutdown 劫持冲突确认 ----
 
@@ -51,7 +30,6 @@ class PageOther:
 
     def _on_shutdown_toggle(self, e):
         if e.control.value:
-            # 打开劫持：检查是否被别的程序占了
             if is_shutdown_hijacked_by_others():
                 self._conflict_dlg = ft.AlertDialog(
                     modal=True,
@@ -71,38 +49,34 @@ class PageOther:
         else:
             release_shutdown_hijack()
 
+    def _on_student_restart_toggle(self, e):
+        if e.control.value:
+            hijack_student_restart()
+        else:
+            release_student_hijack()
+
     def build(self):
         ui = self.ui
 
-        self._unlock_dlg = ft.AlertDialog(
-            modal=True, title=ft.Text("解锁选项"),
-            content=ft.Text(
-                "选择适合你的选项\n"
-                "三者一起: 删除黑屏安静+解除键盘锁+删除控屏锁定程序 (需要注销)\n"
-                "仅控屏: 仅删除控屏锁定程序"
-            ),
-            actions=[
-                ft.TextButton("三者一起", on_click=lambda _: self._close_unlock_dlg(True)),
-                ft.TextButton("仅控屏锁定程序", on_click=lambda _: self._close_unlock_dlg(False)),
-                ft.TextButton("取消", on_click=lambda _: self._close_unlock_dlg(None)),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-
         return ft.Column(controls=[
             ui.yiyanshowtext, ft.Divider(height=1),
-            ft.FilledTonalButton(text="长按以删除脚本文件", icon=ft.icons.CLEANING_SERVICES_OUTLINED, on_long_press=lambda _: del_self_cmd_files()),
-            ft.FilledTonalButton(text="删除键盘锁驱动&控屏锁定程序", icon=ft.icons.KEYBOARD_SHARP, on_click=self._open_unlock_dlg),
-            ft.FilledTonalButton(text="长按恢复所有备份文件", icon=ft.icons.RESTORE, on_long_press=lambda _: restore_oe_key_dlls()),
-            ft.FilledTonalButton(text="长按以恢复黑屏安静程序", icon=ft.icons.ACCOUNT_BOX, on_long_press=lambda _: restore_oe_file("BlackSlient.exe")),
-            ft.FilledTonalButton(text="长按以仅恢复控屏锁定程序", icon=ft.icons.SCREEN_SHARE_SHARP, on_long_press=lambda _: restore_oe_file("MultiClient.exe")),
-            ft.FilledTonalButton(text="停止网络管控服务(不可逆)", icon=ft.icons.WIFI_PASSWORD_SHARP, on_click=lambda _: unlock_network()),
-            ft.FilledTonalButton(text="关闭USB管控服务（测试，不保证可用）", icon=ft.icons.USB_SHARP, on_click=lambda _: usb_unlock()),
+            ft.Text("🧹 清理", size=18, weight=ft.FontWeight.BOLD),
+            ft.FilledTonalButton(text="删除脚本文件", icon=ft.icons.CLEANING_SERVICES_OUTLINED, on_click=lambda _: del_self_cmd_files(), tooltip="删除工具箱生成的所有脚本文件"),
+            ft.Divider(height=1),
+            ft.Text("📸 截图", size=18, weight=ft.FontWeight.BOLD),
             ui.FastGetSC,
+            ft.Divider(height=1),
+            ft.Text("🛡️ 防护", size=18, weight=ft.FontWeight.BOLD),
             PersistentSwitch(
-                label="拦截教师端远程重启 (劫持shutdown.exe)",
+                label="拦截教师端远程关机 (劫持shutdown.exe)",
                 live_getter=is_shutdown_hijacked,
                 verifier=is_shutdown_hijacked,
                 on_toggle=self._on_shutdown_toggle,
+            ),
+            PersistentSwitch(
+                label="拦截教师端远程重启 (摘Student关机权限)",
+                live_getter=is_student_hijacked,
+                verifier=is_student_hijacked,
+                on_toggle=self._on_student_restart_toggle,
             ),
         ])

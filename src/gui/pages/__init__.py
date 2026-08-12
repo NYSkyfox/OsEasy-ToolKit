@@ -2,6 +2,8 @@
 
 from src.gui.pages.page_process import PageProcess
 from src.gui.pages.page_other import PageOther
+from src.gui.pages.page_unlock import PageUnlock
+from src.gui.pages.page_backup import PageBackup
 from src.gui.pages.page_broadcast import PageBroadcast
 from src.gui.pages.page_commands import PageCommands
 from src.gui.pages.page_dll import PageDll

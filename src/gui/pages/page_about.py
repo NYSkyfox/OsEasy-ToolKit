@@ -45,7 +45,7 @@ class PageAbout:
 
         controls = [
             ft.Text(ui.release_name, size=22),
-            ft.ElevatedButton("GitHub", icon=ft.icons.CODE, on_click=open_github_page),
+            ft.ElevatedButton("GitHub", icon=ft.icons.CODE, on_click=open_github_page, tooltip="在浏览器中打开项目GitHub页面"),
             ft.Divider(height=8),
             ft.Row([
                 ft.Icon(admin_icon, size=18, color="#4CAF50" if "管理员" in admin_label else "#FF9800"),

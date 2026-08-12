@@ -1,4 +1,4 @@
-# src/gui/hotkey_manager.py
+# src/utils/program/hotkey_manager.py
 # 快捷键管理中心
 
 import threading
@@ -7,6 +7,43 @@ from collections import defaultdict
 from pynput import keyboard
 
 from src.utils.system.logger import debug
+
+# ══════════════════════════════════════════════════════════
+# 快捷键定义注册表 —— 所有热键在此集中管理
+# ══════════════════════════════════════════════════════════
+
+HOTKEY_DEFS = {
+    "hide_tbox": {
+        "keys": [keyboard.Key.caps_lock, keyboard.Key.enter],
+        "label": "caps+enter 显示/隐藏工具箱",
+    },
+    "fast_screenshot": {
+        "keys": [keyboard.Key.alt_l, 'x'],
+        "label": "Alt+X 截图",
+    },
+    "run_window_broadcast": {
+        "keys": [keyboard.Key.alt_l, 'u'],
+        "label": "Alt+U 窗口广播",
+    },
+    "kill_screen_render": {
+        "keys": [keyboard.Key.alt_l, 'k'],
+        "label": "Alt+K 杀广播进程",
+    },
+    "run_fullscreen_broadcast": {
+        "keys": [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
+        "label": "Ctrl+Alt+F 全屏广播",
+    },
+}
+
+
+def get_hotkey_keys(name: str) -> list:
+    """获取指定热键的键位列表"""
+    return HOTKEY_DEFS[name]["keys"]
+
+
+def get_hotkey_label(name: str) -> str:
+    """获取指定热键的标签"""
+    return HOTKEY_DEFS[name]["label"]
 
 
 class hotkey_manager:
@@ -63,6 +100,15 @@ class hotkey_manager:
             self.register_hotkey(keys=keys, callback=callback)
         else:
             self.unregister_hotkey(keys=keys, callback=callback)
+
+    def switch_by_name(self, name: str, enabled: bool, callback):
+        """按名称开关注册快捷键（从 HOTKEY_DEFS 取 keys + label）
+        :param name:   HOTKEY_DEFS 中的键名
+        :param enabled: True=注册, False=注销
+        :param callback: 回调函数
+        """
+        d = HOTKEY_DEFS[name]
+        self.switch_reg_helper(enabled, d["keys"], callback, d["label"])
 
     @staticmethod
     def _keys_to_str(keys) -> str:
@@ -130,3 +176,7 @@ class hotkey_manager:
         normalized = frozenset(self._normalize_key(k) for k in keys)
         callbacks = self.hotkeys.get(normalized)
         return callbacks is not None and callback in callbacks
+
+    def is_registered_by_name(self, name: str, callback) -> bool:
+        """按名称检查快捷键+回调是否已注册"""
+        return self.is_registered(HOTKEY_DEFS[name]["keys"], callback)

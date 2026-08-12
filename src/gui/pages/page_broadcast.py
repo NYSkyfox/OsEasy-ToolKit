@@ -4,14 +4,14 @@
 import time
 
 import flet as ft
-from pynput import keyboard
 
 from src.core.helpers import run_sigle_cmd
+from src.utils.program.hotkey_manager import get_hotkey_label
 from src.utils.program.persistent_switch import PersistentSwitch
 from src.modules.broadcast_handler import (
     replace_screen_render, restone_screen_render,
     check_replace_screen_render_status,
-    from_log_file_get_remote_cmd, build_run_broadcast_cmd,
+    force_screenrender_windowed,
 )
 from src.modules.service_manager import auto_stop_mmpc_if_needed
 
@@ -59,6 +59,7 @@ class PageBroadcast:
         ui.col_readme_dig = ft.FilledButton(
             "点我查看此页面的使用说明",
             on_click=self._open_readme_dlg,
+            tooltip="查看广播管理页的详细使用说明和操作指引",
         )
 
         ui.replace_status = ft.TextField(
@@ -70,44 +71,45 @@ class PageBroadcast:
         ui.tihuan_scr = ft.FilledTonalButton(
             text="替换拦截命令程序", on_click=self.replace_SCR_loj,
             icon=ft.icons.FIND_REPLACE,
+            tooltip="用自定义程序替换噢易屏幕广播拦截命令程序",
         )
         ui.try_read_sharecmd = ft.FilledTonalButton(
             text="运行窗口化广播命令", on_click=self.run_win_gbcmd_loj,
             icon=ft.icons.WINDOW_SHARP,
+            tooltip="以窗口模式运行教师端屏幕广播命令",
         )
         ui.RunFullSC_btn = ft.FilledTonalButton(
-            "长按运行全屏广播命令",
+            "运行全屏广播命令",
             on_long_press=lambda _: ui.direct_run_fullscreen_broadcast_cmd(),
             icon=ft.icons.FULLSCREEN,
+            tooltip="长按以全屏模式运行教师端屏幕广播命令",
         )
         ui.KillSCR_btn = ft.FilledTonalButton(
-            "手动杀屏幕广播进程", icon=ft.icons.BACK_HAND_OUTLINED,
+            "杀屏幕广播进程", icon=ft.icons.BACK_HAND_OUTLINED,
             on_click=ui.direct_kill_screen_render,
+            tooltip="强制结束所有ScreenRender屏幕广播进程",
         )
         ui.restone_scr = ft.FilledTonalButton(
             text="恢复原有屏幕广播程序", on_click=self.restone_SCR_loj,
             icon=ft.icons.RESTORE_PAGE,
+            tooltip="恢复被替换的原始屏幕广播程序文件",
         )
         ui.runwindows_swc = PersistentSwitch(
             config_key="run_window_broadcast_hotkey",
-            label="Alt+U 运行窗口屏幕广播",
-            verifier=lambda: ui.hotkeyManager.is_registered(
-                [keyboard.Key.alt_l, 'u'], self.run_win_gbcmd_loj),
+            label=get_hotkey_label("run_window_broadcast") + " 运行窗口屏幕广播",
+            verifier=lambda: ui.hotkeyManager.is_registered_by_name("run_window_broadcast", self.run_win_gbcmd_loj),
             on_toggle=lambda _: ui._on_run_window_broadcast_changed(),
         )
         ui.KillSCR_swc = PersistentSwitch(
             config_key="kill_screen_render_hotkey",
-            label="Alt+K 杀屏幕广播进程",
-            verifier=lambda: ui.hotkeyManager.is_registered(
-                [keyboard.Key.alt_l, 'k'], ui.direct_kill_screen_render),
+            label=get_hotkey_label("kill_screen_render") + " 杀屏幕广播进程",
+            verifier=lambda: ui.hotkeyManager.is_registered_by_name("kill_screen_render", ui.direct_kill_screen_render),
             on_toggle=lambda _: ui._on_kill_screen_render_changed(),
         )
         ui.RunFullSC_swc = PersistentSwitch(
             config_key="run_fullscreen_broadcast_hotkey",
-            label="Ctrl+Alt+F 以全屏运行广播命令",
-            verifier=lambda: ui.hotkeyManager.is_registered(
-                [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
-                ui.direct_run_fullscreen_broadcast_cmd),
+            label=get_hotkey_label("run_fullscreen_broadcast") + " 运行广播命令",
+            verifier=lambda: ui.hotkeyManager.is_registered_by_name("run_fullscreen_broadcast", ui.direct_run_fullscreen_broadcast_cmd),
             on_toggle=lambda _: ui._on_run_fullscreen_broadcast_changed(),
         )
 
@@ -125,13 +127,10 @@ class PageBroadcast:
 
     def run_win_gbcmd_loj(self, *e):
         ui = self.ui
-        get = from_log_file_get_remote_cmd()
-        if get is None:
-            ui.show_snakemessage("未拦截到控制命令参数")
+        if force_screenrender_windowed():
+            ui.show_snakemessage("已切换为窗口模式")
         else:
-            bcmd = build_run_broadcast_cmd(YC_command=get)
-            bcmd = bcmd.replace("#fullscreen#:1", "#fullscreen#:0")
-            run_sigle_cmd(bcmd)
+            ui.show_snakemessage("未找到广播窗口，可能尚未开始广播")
 
     def replace_SCR_loj(self, *e):
         ui = self.ui

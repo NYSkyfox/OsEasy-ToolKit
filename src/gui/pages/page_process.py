@@ -27,10 +27,11 @@ class PageProcess:
         )
 
         ui.mmpc_sw = ft.FilledTonalButton(
-            text="长按开&关学生端根服务",
-            icon=ft.icons.BACK_HAND_OUTLINED,
-            on_long_press=lambda _: run_sigle_cmd("sc stop MMPC") if check_mmpc_status() else run_sigle_cmd("sc start MMPC"),
+            text="开/关学生端根服务",
+            icon=ft.icons.POWER_SETTINGS_NEW,
+            on_click=lambda _: run_sigle_cmd("sc stop MMPC") if check_mmpc_status() else run_sigle_cmd("sc start MMPC"),
             on_hover=self.only_update_MMPC_status,
+            tooltip="点击切换MMPC服务的启动/停止状态，悬停查看当前状态",
         )
 
         ui.guaqi_sw = PersistentSwitch(
@@ -56,21 +57,23 @@ class PageProcess:
         return ft.Column(controls=[
             ui.yiyanshowtext, ft.Divider(height=1),
             ui.mmpc_Stext, ui.mmpc_sw,
-            ft.FilledTonalButton(text="长按重启学生端", icon=ft.icons.RESTORE, on_long_press=handle_start_student_client),
-            ft.FilledTonalButton(text="重新获取学生端路径", icon=ft.icons.REFRESH, on_click=ui.reflashStudentPath),
+            ft.FilledTonalButton(text="重启学生端", icon=ft.icons.RESTORE, on_click=handle_start_student_client, tooltip="点击以结束并重新启动学生端进程"),
+            ft.FilledTonalButton(text="重新获取学生端路径", icon=ft.icons.REFRESH, on_click=ui.reflashStudentPath, tooltip="重新检测OsEasy学生端的安装路径和版本"),
             ui.sethc_swc,
             ui.protect_swc,
             ui.guaqi_sw,
-            ft.FilledTonalButton(text="打开噢易自带工具", icon=ft.icons.OPEN_IN_NEW, on_click=launch_oe_toolkit),
+            ft.FilledTonalButton(text="打开噢易自带工具", icon=ft.icons.OPEN_IN_NEW, on_click=launch_oe_toolkit, tooltip="运行OsEasy自带的配置工具"),
             ft.FilledTonalButton(
                 text="打开OsEasy安装目录",
                 icon=ft.icons.FOLDER_OPEN,
                 on_click=self.open_oseasy_dir,
+                tooltip="在资源管理器中打开OsEasy安装文件夹",
             ),
             ft.FilledTonalButton(
                 text="打开ToolKit数据文件夹",
                 icon=ft.icons.FOLDER_SPECIAL,
                 on_click=self.open_toolkit_data_dir,
+                tooltip="打开工具箱的数据存储目录",
             ),
         ])
 

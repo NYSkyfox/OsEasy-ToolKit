@@ -10,7 +10,7 @@ AUTHOR = "NyxFox"
 GITHUB_URL = "https://github.com/NYSkyfox/OsEasy-ToolKit"
 
 # 构建日期（打包时由 build.py 写入）
-BUILD_DATE = ""
+BUILD_DATE = "2026-08-10 16:45:13"
 
 # 默认字体（回退值，实际会按优先级探测可用字体）
 DEFAULT_FONT_PATH = "C:\\Windows\\Fonts\\msyh.ttc"
@@ -58,10 +58,30 @@ DEFAULT_SHOW_YIYAN = "希君生羽翼，一化北溟鱼"
 DEFAULT_ACCENT_COLOR = "#1B5E20"  # 深墨绿 (Material Green 900)
 
 # ---- 脚本文件名（由 SOURCE_NAME 动态拼接） ----
-KILLER_BAT = f"{SOURCE_NAME}-Killer.bat"
-KILLER_V2_BAT = f"{SOURCE_NAME}-KillerV2.bat"
-HELPER_BAT = f"{SOURCE_NAME}-Helper.bat"
-UNLOCK_NET_BAT = f"{SOURCE_NAME}-UnlockNet.bat"
-UNLOCK_USB_BAT = f"{SOURCE_NAME}-UnlockUSB.bat"
-UNLOCK_USB_PS1 = f"{SOURCE_NAME}-UnlockUSB.ps1"
-ALL_SCRIPT_FILES = [KILLER_BAT, HELPER_BAT, "temp.bat", KILLER_V2_BAT, UNLOCK_NET_BAT, UNLOCK_USB_BAT, UNLOCK_USB_PS1]
+KILLER_BAT = "Process-Killer_Student.bat"
+KILLER_V2_BAT = "Process-Killer_All.bat"
+HELPER_BAT = "Files-Delete.bat"
+UNLOCK_NET_BAT = "Unlock-Network.bat"
+UNLOCK_USB_BAT = "Unlock-USB.bat"
+UNLOCK_USB_PS1 = "Unlock-USB.ps1"
+UNLOCK_KB_BAT = "Unlock-Keyboard.bat"
+UNLOCK_ALL_BAT = "Unlock-All.bat"
+
+# ---- 备份文件清单（相对于 OE 安装目录） ----
+BACKUP_FILES = [
+    # 锁定相关
+    "LockKeyboard.dll",
+    "LoadDriver.exe",
+    "KbDriver.exe",
+    # 黑屏/控屏
+    "BlackSlient.exe",
+    "MultiClient.exe",
+    # 网络/USB
+    "OeNetLimit.sys",
+    "OeNetLimitSetup.exe",
+    "oenetlimitx64.cat",
+    "easyusbflt.sys",
+    "ProcFireWall.sys",
+    # 嗅探
+    "x86\\LISSNetInfoSniffer.exe",
+]

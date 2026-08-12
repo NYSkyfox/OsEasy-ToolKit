@@ -7,7 +7,7 @@ import time
 
 from config import RELEASE_NAME, DATA_ROOT_TEMPLATE
 
-# ── 日志预初始化（UAC 提权前，尽可能早） ──
+# ── 日志预初始化（提权前就开始记录日志） ──
 _username = os.environ.get('USERNAME', 'Default')
 _log_dir = DATA_ROOT_TEMPLATE.format(username=_username)
 from src.utils.system.logger import pre_init, error as _log_error, exception as _log_exception
@@ -87,6 +87,10 @@ try:
                 f'rename "{autodesk_dll}" "AdSyncNamespace.dll.bak"'
             )
     # fixed pyqt bind to autodesk360 dll
+
+    # 启动时自动增量备份关键文件（已有则跳过）
+    from src.modules.file_handler import backup_oe_files
+    backup_oe_files(skip_existing=True)
 
     import flet as ft
     from src.gui.app import ToolKit

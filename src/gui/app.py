@@ -6,7 +6,6 @@ import time
 import random
 
 import flet as ft
-from pynput import keyboard
 
 from config import APP_VERSION, RELEASE_NAME, DEFAULT_YIYAN_LIST, DEFAULT_SHOW_YIYAN, DEFAULT_ACCENT_COLOR
 
@@ -16,13 +15,13 @@ from src.modules.service_manager import detect_student_version
 from src.modules.process_manager import utils, get_scshot
 
 from src.modules.broadcast_handler import (
-    from_log_file_get_remote_cmd, build_run_broadcast_cmd,
+    from_log_file_get_remote_cmd, force_screenrender_fullscreen,
 )
 
-from src.gui.hotkey_manager import hotkey_manager
+from src.utils.program.hotkey_manager import hotkey_manager, HOTKEY_DEFS, get_hotkey_keys, get_hotkey_label
 from src.utils.program.persistent_switch import PersistentSwitch
 from src.gui.pages import (
-    PageProcess, PageOther, PageBroadcast, PageCommands,
+    PageProcess, PageOther, PageUnlock, PageBackup, PageBroadcast, PageCommands,
     PageDll, PageSettings, PageAbout,
 )
 from src.utils.system.win_utils import get_windows_accent_color, get_windows_default_font
@@ -69,16 +68,14 @@ class Ui:
     # ============================================================
 
     def direct_run_fullscreen_broadcast_cmd(self):
-        status = from_log_file_get_remote_cmd()
         if getattr(self, 'KillSCR_swc', None) is None:
             self.show_snakemessage("请先打开广播管理页再使用此功能")
             return
         if self.KillSCR_swc.value:
-            if not status:
-                self.show_snakemessage("未拦截到控制命令参数")
+            if force_screenrender_fullscreen():
+                self.show_snakemessage("已恢复全屏模式")
             else:
-                cmd = status.replace("#fullscreen#:0", "#fullscreen#:1")
-                run_sigle_cmd(build_run_broadcast_cmd(cmd))
+                self.show_snakemessage("未找到广播窗口")
         else:
             self.show_snakemessage("警告！ 未开启快捷键杀广播进程\n尝试运行的操作已拦截....")
 
@@ -109,39 +106,33 @@ class Ui:
         self.page.update()
 
     def _on_hide_tbox_changed(self):
-        self.hotkeyManager.switch_reg_helper(
-            self.hide_tbox_swc.value, [keyboard.Key.caps_lock, keyboard.Key.enter],
+        self.hotkeyManager.switch_by_name(
+            "hide_tbox", self.hide_tbox_swc.value,
             self.hide_toolkit_helper,
-            label="caps+enter 显示/隐藏工具箱",
         )
 
     def _on_fast_screenshot_changed(self):
-        self.hotkeyManager.switch_reg_helper(
-            self.FastGetSC.value, [keyboard.Key.alt_l, 'x'],
+        self.hotkeyManager.switch_by_name(
+            "fast_screenshot", self.FastGetSC.value,
             self._scshot_callback,
-            label="Alt+X 截图",
         )
 
     def _on_run_window_broadcast_changed(self):
-        self.hotkeyManager.switch_reg_helper(
-            self.runwindows_swc.value, [keyboard.Key.alt_l, 'u'],
-            self._pages[2].run_win_gbcmd_loj,
-            label="Alt+U 窗口广播",
+        self.hotkeyManager.switch_by_name(
+            "run_window_broadcast", self.runwindows_swc.value,
+            self._pages[3].run_win_gbcmd_loj,
         )
 
     def _on_kill_screen_render_changed(self):
-        self.hotkeyManager.switch_reg_helper(
-            self.KillSCR_swc.value, [keyboard.Key.alt_l, 'k'],
+        self.hotkeyManager.switch_by_name(
+            "kill_screen_render", self.KillSCR_swc.value,
             self.direct_kill_screen_render,
-            label="Alt+K 杀广播进程",
         )
 
     def _on_run_fullscreen_broadcast_changed(self):
-        self.hotkeyManager.switch_reg_helper(
-            self.RunFullSC_swc.value,
-            [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
+        self.hotkeyManager.switch_by_name(
+            "run_fullscreen_broadcast", self.RunFullSC_swc.value,
             self.direct_run_fullscreen_broadcast_cmd,
-            label="Ctrl+Alt+F 全屏广播",
         )
 
     # ============================================================
@@ -159,10 +150,6 @@ class Ui:
         self.page.theme_mode = ft.ThemeMode.SYSTEM if hasattr(ft.ThemeMode, "SYSTEM") else ft.ThemeMode.LIGHT
         self.page.window_height = 635
         self.page.window_width = 450
-        self.page.window_max_height = 2000
-        self.page.window_max_width = 455
-        self.page.window_min_height = 620
-        self.page.window_min_width = 449
         self.page.update()
 
         # ---- 共享组件 ----
@@ -174,10 +161,9 @@ class Ui:
 
         self.hide_tbox_swc = PersistentSwitch(
             config_key=_SETTING_KEYS["hide_tbox"],
-            label="capsLock + enter 隐&显工具箱",
+            label=get_hotkey_label("hide_tbox") + " 隐&显工具箱",
             default_value=True,
-            verifier=lambda: self.hotkeyManager.is_registered(
-                [keyboard.Key.caps_lock, keyboard.Key.enter], self.hide_toolkit_helper),
+            verifier=lambda: self.hotkeyManager.is_registered_by_name("hide_tbox", self.hide_toolkit_helper),
             on_toggle=lambda _: self._on_hide_tbox_changed(),
         )
 
@@ -186,9 +172,8 @@ class Ui:
 
         self.FastGetSC = PersistentSwitch(
             config_key=_SETTING_KEYS["fast_screenshot"],
-            label="Alt+X 快捷键屏幕截图",
-            verifier=lambda: self.hotkeyManager.is_registered(
-                [keyboard.Key.alt_l, 'x'], _screenshot_cb),
+            label=get_hotkey_label("fast_screenshot") + " 屏幕截图",
+            verifier=lambda: self.hotkeyManager.is_registered_by_name("fast_screenshot", _screenshot_cb),
             on_toggle=lambda _: self._on_fast_screenshot_changed(),
         )
 
@@ -197,9 +182,11 @@ class Ui:
         self._pages = [
             PageProcess(self),
             PageOther(self),
+            PageUnlock(self),
             PageBroadcast(self),
             PageCommands(self),
             PageDll(self),
+            PageBackup(self),
             PageSettings(self),
             PageAbout(self),
         ]
@@ -212,11 +199,13 @@ class Ui:
             destinations=[
                 ft.NavigationRailDestination(icon_content=ft.Icon(ft.icons.AUTO_FIX_HIGH_OUTLINED), selected_icon_content=ft.Icon(ft.icons.AUTO_FIX_HIGH), label="进程管理"),
                 ft.NavigationRailDestination(icon=ft.icons.INTEGRATION_INSTRUCTIONS_OUTLINED, selected_icon_content=ft.Icon(ft.icons.INTEGRATION_INSTRUCTIONS), label_content=ft.Text("其他管理")),
+                ft.NavigationRailDestination(icon=ft.icons.LOCK_OPEN_OUTLINED, selected_icon_content=ft.Icon(ft.icons.LOCK_OPEN_SHARP), label="解锁管理"),
                 ft.NavigationRailDestination(icon=ft.icons.SCREEN_SHARE_OUTLINED, selected_icon_content=ft.Icon(ft.icons.SCREEN_SHARE_SHARP), label_content=ft.Text("广播管理")),
                 ft.NavigationRailDestination(icon=ft.icons.VPN_KEY_OUTLINED, selected_icon_content=ft.Icon(ft.icons.VPN_KEY), label="广播命令"),
                 ft.NavigationRailDestination(icon=ft.icons.KEYBOARD_OPTION_KEY_OUTLINED, selected_icon_content=ft.Icon(ft.icons.KEYBOARD_OPTION_KEY), label="DLL工具"),
+                ft.NavigationRailDestination(icon=ft.icons.BACKUP_OUTLINED, selected_icon_content=ft.Icon(ft.icons.BACKUP), label="备份恢复"),
                 ft.NavigationRailDestination(icon=ft.icons.SETTINGS_OUTLINED, selected_icon_content=ft.Icon(ft.icons.SETTINGS), label_content=ft.Text("设置")),
-                ft.NavigationRailDestination(icon=ft.icons.FAVORITE_BORDER_OUTLINED, selected_icon_content=ft.Icon(ft.icons.FAVORITE, color="red"), label="关于"),
+                ft.NavigationRailDestination(icon=ft.icons.INFO_OUTLINE, selected_icon_content=ft.Icon(ft.icons.INFO), label="关于"),
             ],
             on_change=lambda e: self.selPages_Helper(e.control.selected_index),
         )
@@ -239,18 +228,36 @@ class Ui:
         self.pick_a_random_yiyan()
         page = self._pages[index]
         self.apply_bg_to_ui(page.build())
-        if index == 5:
+        if index == 7:
             self.added_pickdialog()
 
     def apply_bg_to_ui(self, needLoad_Stuff_list):
+        # 直接复用页面 Column，设 scroll + expand，不嵌套
+        # Row expand 填满窗口 → Column expand 填满 Row 高度 →
+        # 内容超出行高时 scroll=AUTO 自动出现滚动条 + 鼠标滚轮
+        if isinstance(needLoad_Stuff_list, ft.Column):
+            needLoad_Stuff_list.scroll = ft.ScrollMode.AUTO
+            needLoad_Stuff_list.expand = True
+            needLoad_Stuff_list.alignment = ft.MainAxisAlignment.START
+            needLoad_Stuff_list.horizontal_alignment = ft.CrossAxisAlignment.START
+
         if self.loaded_bg:
-            bgb = ft.Stack(controls=[self.col_imgbg, needLoad_Stuff_list])
-            nedadd = ft.Row([self.MyRail, ft.VerticalDivider(width=0), bgb],
-                            height=self.page.window_height, width=self.page.window_width)
+            bgb = ft.Stack(controls=[self.col_imgbg, needLoad_Stuff_list], expand=True)
+            nedadd = ft.Row(
+                [self.MyRail, ft.VerticalDivider(width=0), bgb],
+                expand=True,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            )
         else:
-            nedadd = ft.Row([self.MyRail, ft.VerticalDivider(width=1), needLoad_Stuff_list],
-                            height=self.page.window_height, width=self.page.window_width)
+            nedadd = ft.Row(
+                [self.MyRail, ft.VerticalDivider(width=0), needLoad_Stuff_list],
+                expand=True,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            )
         self.page.controls = [nedadd]
+        for idlg in self.list_all_pickdialog:
+            if idlg not in self.page.controls:
+                self.page.controls.append(idlg)
         self.page.update()
 
     # ============================================================
@@ -378,17 +385,8 @@ class Ui:
             self.guaqi_runstatus = bool(saved_guaqi)
 
         # 初始注册快捷键（根据恢复后的状态）
-        self.hotkeyManager.switch_reg_helper(
-            self.hide_tbox_swc.value,
-            [keyboard.Key.caps_lock, keyboard.Key.enter],
-            self.hide_toolkit_helper,
-            label="caps+enter 显示/隐藏工具箱",
-        )
-        self.hotkeyManager.switch_reg_helper(
-            self.FastGetSC.value, [keyboard.Key.alt_l, 'x'],
-            self._scshot_callback,
-            label="Alt+X 截图",
-        )
+        self.hotkeyManager.switch_by_name("hide_tbox", self.hide_tbox_swc.value, self.hide_toolkit_helper)
+        self.hotkeyManager.switch_by_name("fast_screenshot", self.FastGetSC.value, self._scshot_callback)
 
         # 广播页的快捷键在 page_broadcast.build() 中恢复（此时控件尚未创建）
 
@@ -397,24 +395,9 @@ class Ui:
         if getattr(self, '_broadcast_hotkeys_restored', False):
             return
         self._broadcast_hotkeys_restored = True
-        self.hotkeyManager.switch_reg_helper(
-            self.runwindows_swc.value,
-            [keyboard.Key.alt_l, 'u'],
-            self._pages[2].run_win_gbcmd_loj,
-            label="Alt+U 窗口广播",
-        )
-        self.hotkeyManager.switch_reg_helper(
-            self.KillSCR_swc.value,
-            [keyboard.Key.alt_l, 'k'],
-            self.direct_kill_screen_render,
-            label="Alt+K 杀广播进程",
-        )
-        self.hotkeyManager.switch_reg_helper(
-            self.RunFullSC_swc.value,
-            [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_vk(70)],
-            self.direct_run_fullscreen_broadcast_cmd,
-            label="Ctrl+Alt+F 全屏广播",
-        )
+        self.hotkeyManager.switch_by_name("run_window_broadcast", self.runwindows_swc.value, self._pages[3].run_win_gbcmd_loj)
+        self.hotkeyManager.switch_by_name("kill_screen_render", self.KillSCR_swc.value, self.direct_kill_screen_render)
+        self.hotkeyManager.switch_by_name("run_fullscreen_broadcast", self.RunFullSC_swc.value, self.direct_run_fullscreen_broadcast_cmd)
 
     def reflash_ui_bg(self):
         toolkit_cfg.set_style_path("bgPath", self.bgpath)
