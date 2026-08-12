@@ -3,7 +3,7 @@
 
 # 基础信息
 APP_NAME = "OsEasy-ToolKit"
-APP_VERSION = "1.8.1-Alpha"
+APP_VERSION = "1.8.0-Bug_Fix"
 RELEASE_NAME = f"{APP_NAME} v{APP_VERSION}"
 SOURCE_NAME = "ToolKit"
 AUTHOR = "NyxFox"
