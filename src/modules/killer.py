@@ -15,7 +15,7 @@ from src.modules.script_generator import script_gen
 from src.utils.system.ifeo import (
     add_ifeo_debugger, remove_ifeo_debugger, query_ifeo_debugger,
 )
-from config import KILLER_BAT, KILLER_V2_BAT, HELPER_BAT
+from config import KILLER_BAT, KILLER_ALL_BAT, FILE_DEL_BAT
 
 # 守护进程启动的 cmd PID（用于关闭时精确杀进程 / 检测存活）
 _killer_protect_pid = None
@@ -62,7 +62,7 @@ def is_killer_protected() -> bool:
 def register_killer_v2_cmd() -> None:
     """生成击杀脚本V2并绑定粘滞键"""
     script_gen.summon_killer_v2()
-    add_ifeo_debugger("sethc.exe", os.path.join(cmd_file_path, KILLER_V2_BAT))
+    add_ifeo_debugger("sethc.exe", os.path.join(cmd_file_path, KILLER_ALL_BAT))
 
 
 def ensure_killer_running() -> None:
@@ -121,7 +121,7 @@ def delete_locked_and_logout(need_shutdown: bool) -> None:
     ensure_killer_running()
     script_gen.summon_del_dll(delMtc=True, shutdown=need_shutdown)
     time.sleep(2)
-    runbat(HELPER_BAT)
+    runbat(FILE_DEL_BAT)
 
 
 def launch_oe_toolkit(*e) -> None:

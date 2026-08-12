@@ -55,12 +55,12 @@ DEFAULT_SHOW_YIYAN = "希君生羽翼，一化北溟鱼"
 
 # ---- UI 主题色 ----
 # 默认主题色（墨绿色），会在启动时尝试读取 Windows 系统主题色覆盖
-DEFAULT_ACCENT_COLOR = "#1B5E20"  # 深墨绿 (Material Green 900)
+DEFAULT_ACCENT_COLOR = "#3B8a67"
 
-# ---- 脚本文件名（由 SOURCE_NAME 动态拼接） ----
+# ---- 脚本文件名 ----
 KILLER_BAT = "Process-Killer_Student.bat"
-KILLER_V2_BAT = "Process-Killer_All.bat"
-HELPER_BAT = "Files-Delete.bat"
+KILLER_ALL_BAT = "Process-Killer_All.bat"
+FILE_DEL_BAT = "Files-Delete.bat"
 UNLOCK_NET_BAT = "Unlock-Network.bat"
 UNLOCK_USB_BAT = "Unlock-USB.bat"
 UNLOCK_USB_PS1 = "Unlock-USB.ps1"

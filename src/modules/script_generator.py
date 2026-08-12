@@ -2,7 +2,7 @@
 # 脚本生成器 —— 业务逻辑（模板在 script_templates.py）
 
 from config import (
-    KILLER_BAT, KILLER_V2_BAT, HELPER_BAT,
+    KILLER_BAT, KILLER_ALL_BAT, FILE_DEL_BAT,
     UNLOCK_NET_BAT, UNLOCK_USB_BAT, UNLOCK_USB_PS1,
     UNLOCK_KB_BAT, UNLOCK_ALL_BAT,
 )
@@ -137,14 +137,14 @@ class script_gen:
     def summon_del_dll(delMtc: bool, shutdown: bool) -> None:
         from src.modules.file_handler import backup_oe_files
         backup_oe_files()
-        _write(HELPER_BAT, tpl_files_delete(delMtc, shutdown))
+        _write(FILE_DEL_BAT, tpl_files_delete(delMtc, shutdown))
 
     @staticmethod
     def delete_files_block():
         from src.modules.file_handler import backup_oe_files
         backup_oe_files()
         script_gen.summon_del_dll(delMtc=True, shutdown=False)
-        runbat(HELPER_BAT)
+        runbat(FILE_DEL_BAT)
 
     @staticmethod
     def delete_files_unlock():
@@ -176,7 +176,7 @@ class script_gen:
 
     @staticmethod
     def summon_killer_v2() -> None:
-        _write(KILLER_V2_BAT, tpl_process_killer_all())
+        _write(KILLER_ALL_BAT, tpl_process_killer_all())
 
     @staticmethod
     def summon_killer() -> None:
