@@ -1,4 +1,4 @@
-flet-desktop==0.25.0
+flet-desktop==0.28.3
 pynput
 psutil
 winotify

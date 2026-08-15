@@ -16,7 +16,7 @@ def detect_student_path() -> tuple[str, str] | tuple[bool, None]:
     若未运行则回退读取配置文件中上次保存的路径。"""
     Spath = utils.get_program_path("Student.exe")
     Spath_2 = utils.get_program_path("MmcStudent.exe")
-    # v10.9.1 学生端改名为 MmcStudent.exe
+    # v10.9.5 学生端改名为 MmcStudent.exe
 
     if Spath is None and Spath_2 is None:
         print("[DEBUG] > 未找到运行中的学生端")
@@ -137,5 +137,19 @@ def check_mmpc_status() -> bool:
         return False
 
 
+def _kill_student_process() -> None:
+    """结束学生端进程（兼容新旧版本进程名），忽略未找到的情况"""
+    from src.utils.system.logger import debug, exception
+    for exe_name in ("Student.exe", "MmcStudent.exe"):
+        try:
+            # /F 强制结束，/T 连同子进程树一起结束，/IM 按映像名称匹配
+            run_sigle_cmd(f'taskkill /F /T /IM {exe_name}')
+            debug(f"已结束学生端进程: {exe_name}")
+        except Exception:
+            exception(f"结束学生端进程失败: {exe_name}")
+
+
 def handle_start_student_client(*e) -> None:
+    # 先结束学生端进程，再重新启动
+    _kill_student_process()
     os.startfile(f"{toolkit_cfg.oseasy_path}{toolkit_cfg.student_exe_name}")

@@ -21,7 +21,7 @@ class PageCommands:
 
         ui.teachIp_input = ft.TextField(label="输入教师机IP地址")
         ui.auto_gennerate_cmd = ft.FilledTonalButton(
-            text="由教师机IP生成远程命令", icon=ft.icons.DRAW,
+            text="由教师机IP生成远程命令", icon=ft.Icons.DRAW,
             on_click=lambda _: generate_remote_cmd_and_save(ui.teachIp_input.value),
             tooltip="根据教师机IP地址自动生成完整的远程广播控制命令",
         )
@@ -29,22 +29,22 @@ class PageCommands:
         ui.conl_ycCmd_update_with_replace_ip = ft.FilledTonalButton(
             "自动替换本地IP并更新命令",
             on_click=lambda _: handin_save_yc_cmd(ui.conl_save_ycCmd_input.value, True),
-            icon=ft.icons.DRAW,
+            icon=ft.Icons.DRAW,
             tooltip="自动检测本机IP地址并替换更新远程广播命令",
         )
         ui.conl_ycCmd_update = ft.FilledTonalButton(
             "手动更新完整远程广播命令",
             on_click=lambda _: handin_save_yc_cmd(ui.conl_save_ycCmd_input.value, False),
-            icon=ft.icons.MODE_EDIT_SHARP,
+            icon=ft.Icons.MODE_EDIT_SHARP,
             tooltip="手动输入并保存完整的远程广播控制命令",
         )
         ui.conl_from_log_get_cmd = ft.FilledTonalButton(
-            text="从日志文件获取远程命令", icon=ft.icons.BOOK,
+            text="从日志文件获取远程命令", icon=ft.Icons.BOOK,
             on_click=lambda _: extract_yc_cmd_from_log(),
             tooltip="从ScreenRender.log日志中提取教师端远程广播命令",
         )
         ui.conl_getyccmd_btn = ft.FilledTonalButton(
-            text="读取已拦截的广播命令", icon=ft.icons.BOOK,
+            text="读取已拦截的广播命令", icon=ft.Icons.BOOK,
             on_click=self.dev_read_lj_cmd_loj,
             tooltip="读取之前已拦截并保存的广播控制命令",
         )

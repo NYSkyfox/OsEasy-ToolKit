@@ -5,6 +5,7 @@ __pycache__/
 dist/
 build/
 *.spec
+docs/
 
 # IDE
 .vscode/
@@ -20,3 +21,11 @@ venv/
 
 # Logs / data
 *.log
+
+# flet 离线打包产物（体积大，不入库）
+offline_wheels/
+flet-windows.zip
+_tmp*/
+
+# 忽略 .gitignore 自身（本地维护，不入库）
+.gitignore

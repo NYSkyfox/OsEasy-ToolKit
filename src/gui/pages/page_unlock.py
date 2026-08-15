@@ -25,25 +25,23 @@ class PageUnlock:
     # ---- 对话框 ----
 
     def _close_unlock_kb_dlg(self, confirm):
-        self._unlock_dlg.open = False
+        self.ui.page.close(self._unlock_dlg)
         self.ui.page.update()
         if confirm:
             keyboard_unlock()
 
     def _close_unlock_all_dlg(self, confirm):
-        self._unlock_all_dlg.open = False
+        self.ui.page.close(self._unlock_all_dlg)
         self.ui.page.update()
         if confirm:
             unlock_all()
 
     def _open_unlock_kb_dlg(self, *e):
-        self.ui.page.dialog = self._unlock_dlg
-        self._unlock_dlg.open = True
+        self.ui.page.open(self._unlock_dlg)
         self.ui.page.update()
 
     def _open_unlock_all_dlg(self, *e):
-        self.ui.page.dialog = self._unlock_all_dlg
-        self._unlock_all_dlg.open = True
+        self.ui.page.open(self._unlock_all_dlg)
         self.ui.page.update()
 
     # ---- 构建页面 ----
@@ -86,37 +84,37 @@ class PageUnlock:
             ui.yiyanshowtext, ft.Divider(height=1),
             ft.FilledTonalButton(
                 text="一键脱离管控（解锁全部）",
-                icon=ft.icons.LOCK_OPEN_SHARP,
+                icon=ft.Icons.LOCK_OPEN_SHARP,
                 on_click=self._open_unlock_all_dlg,
                 tooltip="依次解锁网络、USB、键盘鼠标管控，操作后自动注销",
             ),
             ft.FilledTonalButton(
                 text="仅解锁键盘鼠标驱动",
-                icon=ft.icons.KEYBOARD_SHARP,
+                icon=ft.Icons.KEYBOARD_SHARP,
                 on_click=self._open_unlock_kb_dlg,
                 tooltip="停止KbFilter键盘过滤驱动并清理注册表，操作后自动注销",
             ),
             ft.FilledTonalButton(
                 text="仅停止网络管控服务",
-                icon=ft.icons.WIFI_PASSWORD_SHARP,
+                icon=ft.Icons.WIFI_PASSWORD_SHARP,
                 on_click=lambda _: network_unlock(),
                 tooltip="停止OeNetLimit和ProcFireWall服务，不可恢复",
             ),
             ft.FilledTonalButton(
                 text="仅关闭USB管控服务",
-                icon=ft.icons.USB_SHARP,
+                icon=ft.Icons.USB_SHARP,
                 on_click=lambda _: usb_unlock(),
                 tooltip="停止easyusbflt USB过滤驱动服务",
             ),
             ft.FilledTonalButton(
                 text="仅移除黑屏肃静",
-                icon=ft.icons.DARK_MODE,
+                icon=ft.Icons.DARK_MODE,
                 on_click=self._handle_black_screen,
                 tooltip="强制结束BlackSlient.exe黑屏进程",
             ),
             ft.FilledTonalButton(
                 text="仅移除屏幕广播",
-                icon=ft.icons.STOP_SCREEN_SHARE,
+                icon=ft.Icons.STOP_SCREEN_SHARE,
                 on_click=self._handle_screen_control,
                 tooltip="关服务 + 杀ScreenRender进程 + 删除控屏程序文件",
             ),

@@ -24,8 +24,7 @@ class PageBroadcast:
     def _close_readme_dlg(self):
         ui = self.ui
         if hasattr(self, '_readme_dlg'):
-            self._readme_dlg.open = False
-        ui.page.dialog = None
+            ui.page.close(self._readme_dlg)
         ui.show_snakemessage("Have Fun")
         ui.page.update()
 
@@ -49,8 +48,7 @@ class PageBroadcast:
 
     def _open_readme_dlg(self, *e):
         self._readme_dlg = self._build_readme_dlg()
-        self.ui.page.dialog = self._readme_dlg
-        self._readme_dlg.open = True
+        self.ui.page.open(self._readme_dlg)
         self.ui.page.update()
 
     def build(self):
@@ -70,28 +68,28 @@ class PageBroadcast:
 
         ui.tihuan_scr = ft.FilledTonalButton(
             text="替换拦截命令程序", on_click=self.replace_SCR_loj,
-            icon=ft.icons.FIND_REPLACE,
+            icon=ft.Icons.FIND_REPLACE,
             tooltip="用自定义程序替换噢易屏幕广播拦截命令程序",
         )
         ui.try_read_sharecmd = ft.FilledTonalButton(
             text="运行窗口化广播命令", on_click=self.run_win_gbcmd_loj,
-            icon=ft.icons.WINDOW_SHARP,
+            icon=ft.Icons.WINDOW_SHARP,
             tooltip="以窗口模式运行教师端屏幕广播命令",
         )
         ui.RunFullSC_btn = ft.FilledTonalButton(
             "运行全屏广播命令",
             on_long_press=lambda _: ui.direct_run_fullscreen_broadcast_cmd(),
-            icon=ft.icons.FULLSCREEN,
+            icon=ft.Icons.FULLSCREEN,
             tooltip="长按以全屏模式运行教师端屏幕广播命令",
         )
         ui.KillSCR_btn = ft.FilledTonalButton(
-            "杀屏幕广播进程", icon=ft.icons.BACK_HAND_OUTLINED,
+            "杀屏幕广播进程", icon=ft.Icons.BACK_HAND_OUTLINED,
             on_click=ui.direct_kill_screen_render,
             tooltip="强制结束所有ScreenRender屏幕广播进程",
         )
         ui.restone_scr = ft.FilledTonalButton(
             text="恢复原有屏幕广播程序", on_click=self.restone_SCR_loj,
-            icon=ft.icons.RESTORE_PAGE,
+            icon=ft.Icons.RESTORE_PAGE,
             tooltip="恢复被替换的原始屏幕广播程序文件",
         )
         ui.runwindows_swc = PersistentSwitch(

@@ -193,9 +193,30 @@ def build_args():
     if flet_path.exists():
         args.extend(["--add-data", f"{flet_path}{flet_datasep}flet"])
     if flet_desktop_path and flet_desktop_path.exists():
-        args.extend(["--add-data", f"{flet_desktop_path}{flet_datasep}flet_desktop"])
+        # 只打包解压后的桌面客户端目录 app/flet（运行时优先使用它），
+        # 排除同目录下的 app/flet-windows.zip：
+        #   运行时 __locate_and_unpack_flet_view 只在 app/flet/flet.exe 不存在时
+        #   才联网下载 zip，包内自带的 zip 永远不会被解压，纯属浪费 ~39MB。
+        fd_flet = flet_desktop_path / "app" / "flet"
+        if fd_flet.exists():
+            args.extend([
+                "--add-data",
+                f"{fd_flet}{flet_datasep}flet_desktop{os.sep}app{os.sep}flet",
+            ])
+        else:
+            # 兜底：没有解压版客户端则退回打包整个包
+            args.extend(["--add-data", f"{flet_desktop_path}{flet_datasep}flet_desktop"])
     args.extend(["--hidden-import", "flet"])
     args.extend(["--hidden-import", "flet_desktop"])
+
+    # ---- 内置 flet 桌面客户端（避免目标机首次运行在线下载） ----
+    # flet 运行时 __locate_and_unpack_flet_view 优先使用解压版
+    # flet_desktop/app/flet/flet.exe（已在上方打包），只有它不存在时才会
+    # 联网下载 flet-windows.zip。因此无需再打包任何 zip。
+    if flet_desktop_path and (flet_desktop_path / "app" / "flet" / "flet.exe").exists():
+        print("[内置客户端] 已打包解压版桌面客户端 (app/flet)，目标机可离线运行")
+    else:
+        print("[内置客户端] 未找到解压版桌面客户端 app/flet，目标机首次运行将在线下载")
 
     if ICON_PATH and Path(ICON_PATH).exists():
         args.extend(["--icon", ICON_PATH])
@@ -203,6 +224,13 @@ def build_args():
     # ---- 添加数据文件（打包进 exe 的资源） ----
     args.extend(["--add-data", f"Fake_SCR.py{os.pathsep}."])
     args.extend(["--add-data", f"config.py{os.pathsep}."])
+
+    # 窗口/任务栏图标（供 flet 的 page.window.icon 在运行时使用）
+    if Path("logo.png").exists():
+        args.extend(["--add-data", f"logo.png{os.pathsep}."])
+        print("[图标] 已打包 logo.png（窗口/任务栏图标）")
+    else:
+        print("[图标] 未找到 logo.png，窗口将使用 flet 默认图标")
 
     # ScreenRender_Helper.exe（如果存在）
     screen_helper = Path("ScreenRender_Helper.exe")

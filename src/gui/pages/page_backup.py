@@ -58,7 +58,7 @@ class PageBackup:
             ft.Text("📦 备份", size=18, weight=ft.FontWeight.BOLD),
             ft.FilledTonalButton(
                 text="备份所有关键文件",
-                icon=ft.icons.BACKUP,
+                icon=ft.Icons.BACKUP,
                 on_click=self._backup_all,
                 tooltip=f"将 {len(BACKUP_FILES)} 个 OsEasy 关键文件备份到工具箱数据目录",
             ),
@@ -66,7 +66,7 @@ class PageBackup:
             ft.Text("🔄 恢复", size=18, weight=ft.FontWeight.BOLD),
             ft.FilledTonalButton(
                 text="恢复所有关键文件",
-                icon=ft.icons.RESTORE,
+                icon=ft.Icons.RESTORE,
                 on_click=self._restore_all,
                 tooltip=f"从备份恢复全部 {len(BACKUP_FILES)} 个文件到 OsEasy 安装目录",
             ),

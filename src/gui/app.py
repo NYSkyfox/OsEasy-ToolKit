@@ -22,9 +22,9 @@ from src.utils.program.hotkey_manager import hotkey_manager, HOTKEY_DEFS, get_ho
 from src.utils.program.persistent_switch import PersistentSwitch
 from src.gui.pages import (
     PageProcess, PageOther, PageUnlock, PageBackup, PageBroadcast, PageCommands,
-    PageDll, PageSettings, PageAbout,
+    PageDll, PageSettings, PageAbout, PageCrash,
 )
-from src.utils.system.win_utils import get_windows_accent_color, get_windows_default_font
+from src.utils.system.win_utils import get_windows_accent_color, get_windows_default_font, resource_path
 
 # 配置文件中保存的设置 key 名
 _SETTING_KEYS = {
@@ -102,7 +102,7 @@ class Ui:
         )
 
     def hide_toolkit_helper(self):
-        self.page.window_visible = not self.page.window_visible
+        self.page.window.visible = not self.page.window.visible
         self.page.update()
 
     def _on_hide_tbox_changed(self):
@@ -148,8 +148,21 @@ class Ui:
             color_scheme_seed=self.accent_color,
         )
         self.page.theme_mode = ft.ThemeMode.SYSTEM if hasattr(ft.ThemeMode, "SYSTEM") else ft.ThemeMode.LIGHT
-        self.page.window_height = 635
-        self.page.window_width = 450
+        self.page.window.width = 480
+        self.page.window.height = 700
+        # 自定义窗口/任务栏图标（覆盖 flet 桌面客户端的默认图标）
+        try:
+            self.page.window.icon = resource_path("logo.png")
+        except Exception:
+            pass
+        # 中文本地化：让输入框右键菜单（复制/粘贴/全选等）显示为中文
+        try:
+            self.page.locale_configuration = ft.LocaleConfiguration(
+                supported_locales=[ft.Locale("zh", "CN")],
+                current_locale=ft.Locale("zh", "CN"),
+            )
+        except Exception:
+            pass
         self.page.update()
 
         # ---- 共享组件 ----
@@ -189,6 +202,7 @@ class Ui:
             PageBackup(self),
             PageSettings(self),
             PageAbout(self),
+            PageCrash(self),
         ]
 
         # ---- 导航栏 ----
@@ -197,15 +211,16 @@ class Ui:
             selected_index=0, label_type="ALL", min_width=30, min_extended_width=30,
             group_alignment=-0.8, expand=False,
             destinations=[
-                ft.NavigationRailDestination(icon_content=ft.Icon(ft.icons.AUTO_FIX_HIGH_OUTLINED), selected_icon_content=ft.Icon(ft.icons.AUTO_FIX_HIGH), label="进程管理"),
-                ft.NavigationRailDestination(icon=ft.icons.INTEGRATION_INSTRUCTIONS_OUTLINED, selected_icon_content=ft.Icon(ft.icons.INTEGRATION_INSTRUCTIONS), label_content=ft.Text("其他管理")),
-                ft.NavigationRailDestination(icon=ft.icons.LOCK_OPEN_OUTLINED, selected_icon_content=ft.Icon(ft.icons.LOCK_OPEN_SHARP), label="解锁管理"),
-                ft.NavigationRailDestination(icon=ft.icons.SCREEN_SHARE_OUTLINED, selected_icon_content=ft.Icon(ft.icons.SCREEN_SHARE_SHARP), label_content=ft.Text("广播管理")),
-                ft.NavigationRailDestination(icon=ft.icons.VPN_KEY_OUTLINED, selected_icon_content=ft.Icon(ft.icons.VPN_KEY), label="广播命令"),
-                ft.NavigationRailDestination(icon=ft.icons.KEYBOARD_OPTION_KEY_OUTLINED, selected_icon_content=ft.Icon(ft.icons.KEYBOARD_OPTION_KEY), label="DLL工具"),
-                ft.NavigationRailDestination(icon=ft.icons.BACKUP_OUTLINED, selected_icon_content=ft.Icon(ft.icons.BACKUP), label="备份恢复"),
-                ft.NavigationRailDestination(icon=ft.icons.SETTINGS_OUTLINED, selected_icon_content=ft.Icon(ft.icons.SETTINGS), label_content=ft.Text("设置")),
-                ft.NavigationRailDestination(icon=ft.icons.INFO_OUTLINE, selected_icon_content=ft.Icon(ft.icons.INFO), label="关于"),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.AUTO_FIX_HIGH_OUTLINED), selected_icon=ft.Icon(ft.Icons.AUTO_FIX_HIGH), label="进程管理"),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.INTEGRATION_INSTRUCTIONS_OUTLINED), selected_icon=ft.Icon(ft.Icons.INTEGRATION_INSTRUCTIONS), label_content=ft.Text("其他管理")),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.LOCK_OPEN_OUTLINED), selected_icon=ft.Icon(ft.Icons.LOCK_OPEN_SHARP), label="解锁管理"),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.SCREEN_SHARE_OUTLINED), selected_icon=ft.Icon(ft.Icons.SCREEN_SHARE_SHARP), label_content=ft.Text("广播管理")),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.VPN_KEY_OUTLINED), selected_icon=ft.Icon(ft.Icons.VPN_KEY), label="广播命令"),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.KEYBOARD_OPTION_KEY_OUTLINED), selected_icon=ft.Icon(ft.Icons.KEYBOARD_OPTION_KEY), label="DLL工具"),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.BACKUP_OUTLINED), selected_icon=ft.Icon(ft.Icons.BACKUP), label="备份恢复"),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.SETTINGS_OUTLINED), selected_icon=ft.Icon(ft.Icons.SETTINGS), label_content=ft.Text("设置")),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.INFO_OUTLINE), selected_icon=ft.Icon(ft.Icons.INFO), label="关于"),
+                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.WIFI_TETHERING_OUTLINED), selected_icon=ft.Icon(ft.Icons.WIFI_TETHERING), label="远程崩溃"),
             ],
             on_change=lambda e: self.selPages_Helper(e.control.selected_index),
         )
@@ -291,17 +306,17 @@ class Ui:
 
     def guaqi_chufa(self, *e):
         if not self.guaqi_runstatus:
-            self.page.window_visible = False
+            self.page.window.visible = False
             self.page.update()
             status = utils.guaqi_process(toolkit_cfg.student_exe_name)
             utils.guaqi_process("MultiClient.exe")
             if status is True:
                 self.guaqi_runstatus = True
                 time.sleep(0.8)
-                self.page.window_visible = True
+                self.page.window.visible = True
                 self.page.update()
             else:
-                self.page.window_visible = True
+                self.page.window.visible = True
                 self.guaqi_runstatus = False
                 toolkit_cfg.set_config_key_data(_SETTING_KEYS["guaqi"], False)
                 self.guaqi_sw.value = False
@@ -403,9 +418,8 @@ class Ui:
         toolkit_cfg.set_style_path("bgPath", self.bgpath)
         self.loaded_bg = True
         self.col_imgbg = ft.Image(
-            src=self.bgpath, height=self.page.window_height,
-            width=self.page.window_width - 100, opacity=self.bgtmd,
-            fit=ft.ImageFit.SCALE_DOWN,
+            src=self.bgpath, opacity=self.bgtmd,
+            fit=ft.ImageFit.COVER, expand=True,
         )
         self.selPages_Helper(int(self.NowSelIndex))
 
@@ -485,21 +499,21 @@ class Ui:
         try:
             self.bgpath = os.path.join(e.files[0].path)
             self.reflash_ui_bg()
-        except TypeError:
+        except (TypeError, IndexError):
             self.show_snakemessage("未选择背景图片")
 
     def yiyan_pick_files_result(self, e):
         try:
             self.yiyanfpath = os.path.join(e.files[0].path)
             self.from_file_load_yiyan()
-        except TypeError:
+        except (TypeError, IndexError):
             self.show_snakemessage("未选择一言文件")
 
     def font_pick_files_result(self, e):
         try:
             self.zdy_fontpath = os.path.join(e.files[0].path)
             self.setup_zidingyi_font()
-        except TypeError:
+        except (TypeError, IndexError):
             self.show_snakemessage("未选择字体文件")
 
     # ============================================================
@@ -507,8 +521,7 @@ class Ui:
     # ============================================================
 
     def show_snakemessage(self, showtext: str):
-        self.page.snack_bar = ft.SnackBar(ft.Text(showtext))
-        self.page.snack_bar.open = True
+        self.page.open(ft.SnackBar(ft.Text(showtext)))
         self.page.update()
 
     def _run_in_thread(self, func, label: str = "操作"):

@@ -20,12 +20,12 @@ class PageOther:
         hijack_shutdown()
 
     def _on_shutdown_conflict_confirm(self, e):
-        self._conflict_dlg.open = False
+        self.ui.page.close(self._conflict_dlg)
         self.ui.page.update()
         self._do_hijack_shutdown()
 
     def _on_shutdown_conflict_cancel(self, e):
-        self._conflict_dlg.open = False
+        self.ui.page.close(self._conflict_dlg)
         self.ui.page.update()
 
     def _on_shutdown_toggle(self, e):
@@ -41,8 +41,7 @@ class PageOther:
                     ],
                     actions_alignment=ft.MainAxisAlignment.END,
                 )
-                self.ui.page.dialog = self._conflict_dlg
-                self._conflict_dlg.open = True
+                self.ui.page.open(self._conflict_dlg)
                 self.ui.page.update()
             else:
                 self._do_hijack_shutdown()
@@ -61,7 +60,7 @@ class PageOther:
         return ft.Column(controls=[
             ui.yiyanshowtext, ft.Divider(height=1),
             ft.Text("🧹 清理", size=18, weight=ft.FontWeight.BOLD),
-            ft.FilledTonalButton(text="删除脚本文件", icon=ft.icons.CLEANING_SERVICES_OUTLINED, on_click=lambda _: del_self_cmd_files(), tooltip="删除工具箱生成的所有脚本文件"),
+            ft.FilledTonalButton(text="删除脚本文件", icon=ft.Icons.CLEANING_SERVICES_OUTLINED, on_click=lambda _: del_self_cmd_files(), tooltip="删除工具箱生成的所有脚本文件"),
             ft.Divider(height=1),
             ft.Text("📸 截图", size=18, weight=ft.FontWeight.BOLD),
             ui.FastGetSC,

@@ -1,7 +1,27 @@
 # src/utils/win_utils.py
 # Windows 系统工具函数
 
+import os
+import sys
+
 from config import DEFAULT_ACCENT_COLOR, DEFAULT_FONT_PATH
+
+
+def resource_path(relative: str) -> str:
+    """解析打包资源路径。
+
+    PyInstaller 单文件(--onefile)模式下，打包进去的数据文件会被解压到
+    sys._MEIPASS 临时目录；源码运行时资源就在项目根目录。
+    用于定位 logo.png 等内置资源。
+    """
+    if getattr(sys, "frozen", False):
+        base = sys._MEIPASS
+    else:
+        # 本文件位于 src/utils/system/win_utils.py → 上溯 4 层到项目根
+        base = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        )
+    return os.path.join(base, relative)
 
 
 def get_windows_accent_color() -> str:

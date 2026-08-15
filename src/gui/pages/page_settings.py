@@ -15,12 +15,11 @@ class PageSettings:
         self.ui = ui
 
     def _open_reset_dlg(self, *e):
-        self.ui.page.dialog = self._reset_dlg
-        self._reset_dlg.open = True
+        self.ui.page.open(self._reset_dlg)
         self.ui.page.update()
 
     def _close_reset_dlg(self, confirm):
-        self._reset_dlg.open = False
+        self.ui.page.close(self._reset_dlg)
         self.ui.page.update()
         if confirm:
             self._do_reset()
@@ -96,7 +95,7 @@ class PageSettings:
 
         ui.bgfilepick = ft.ElevatedButton(
             "切换背景图片",
-            icon=ft.icons.UPLOAD_FILE,
+            icon=ft.Icons.UPLOAD_FILE,
             on_click=lambda _: ui.pick_files_dialog.pick_files(
                 allow_multiple=False, file_type="IMAGE"
             ),
@@ -104,7 +103,7 @@ class PageSettings:
         )
         ui.zitibtn = ft.ElevatedButton(
             "更换显示字体",
-            icon=ft.icons.UPLOAD_SHARP,
+            icon=ft.Icons.UPLOAD_SHARP,
             on_click=lambda _: ui.font_pick_files_dialog.pick_files(
                 allow_multiple=False, allowed_extensions=["ttf"]
             ),
@@ -112,7 +111,7 @@ class PageSettings:
         )
         ui.yiyanbtn = ft.ElevatedButton(
             "加载外部一言文件",
-            icon=ft.icons.UPLOAD_SHARP,
+            icon=ft.Icons.UPLOAD_SHARP,
             on_click=lambda _: ui.yiyan_pick_files_dialog.pick_files(
                 allow_multiple=False, allowed_extensions=["txt"]
             ),
@@ -125,7 +124,7 @@ class PageSettings:
         )
         ui.remove_rem = ft.ElevatedButton(
             "重置工具箱设置",
-            icon=ft.icons.DELETE_OUTLINE,
+            icon=ft.Icons.DELETE_OUTLINE,
             on_click=self._open_reset_dlg,
             tooltip="清除外观设置、删除日志文件和已生成的脚本",
         )
@@ -147,7 +146,7 @@ class PageSettings:
         )
         ui.bgtmd_text = ft.Text("滑动以调整背景图片不透明度")
         ui.bgtmdb = ft.Slider(
-            min=0.0, max=1.0, divisions=0.1, value=ui.bgtmd,
+            min=0.0, max=1.0, divisions=10, value=ui.bgtmd,
             on_change_end=ui.change_bg_btmd, disabled=not ui.loaded_bg,
         )
 

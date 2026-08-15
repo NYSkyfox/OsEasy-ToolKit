@@ -23,14 +23,14 @@ def _get_admin_status() -> tuple[str, str, str | None]:
         from src.utils.system.uac_elevator import is_admin
         admin = is_admin()
     except Exception:
-        return ("未知权限", ft.icons.HELP_OUTLINE, None)
+        return ("未知权限", ft.Icons.HELP_OUTLINE, None)
 
     if admin:
         method = os.environ.get("OSEASY_PRIV_METHOD", "")
         method_label = _PRIV_METHOD_LABELS.get(method, f"提权方式: 未知 ({method})") if method else "提权方式: 未知"
-        return ("当前权限：管理员", ft.icons.ADMIN_PANEL_SETTINGS, method_label)
+        return ("当前权限：管理员", ft.Icons.ADMIN_PANEL_SETTINGS, method_label)
     else:
-        return ("当前权限：普通用户", ft.icons.PERSON_OUTLINE, None)
+        return ("当前权限：普通用户", ft.Icons.PERSON_OUTLINE, None)
 
 
 class PageAbout:
@@ -45,7 +45,7 @@ class PageAbout:
 
         controls = [
             ft.Text(ui.release_name, size=22),
-            ft.ElevatedButton("GitHub", icon=ft.icons.CODE, on_click=open_github_page, tooltip="在浏览器中打开项目GitHub页面"),
+            ft.ElevatedButton("GitHub", icon=ft.Icons.CODE, on_click=open_github_page, tooltip="在浏览器中打开项目GitHub页面"),
             ft.Divider(height=8),
             ft.Row([
                 ft.Icon(admin_icon, size=18, color="#4CAF50" if "管理员" in admin_label else "#FF9800"),

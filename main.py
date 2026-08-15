@@ -94,6 +94,11 @@ try:
 
     import flet as ft
     from src.gui.app import ToolKit
+    from src.utils.program.flet_client_rename import apply_flet_client_rename
+
+    # 以自定义进程名（ToolKitClient.exe）启动 flet 桌面客户端，
+    # 规避部分设备的进程名黑名单（如 flet.exe 被禁止运行）。
+    apply_flet_client_rename()
 
     ft.app(target=ToolKit.main)
 

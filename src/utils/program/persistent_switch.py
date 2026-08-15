@@ -106,10 +106,11 @@ class PersistentSwitch(ft.Switch):
     def _show_verify_fail(self, expected: bool, actual: bool):
         """显示验证失败的提示"""
         label = getattr(self, 'label', '此功能') or '此功能'
-        self.page.snack_bar = ft.SnackBar(
-            ft.Text(f"⚠ {label} 未生效（可能权限不足或被拦截），已自动恢复"),
-            duration=4000,
+        self.page.open(
+            ft.SnackBar(
+                ft.Text(f"⚠ {label} 未生效（可能权限不足或被拦截），已自动恢复"),
+                duration=4000,
+            )
         )
-        self.page.snack_bar.open = True
         self.update()
         self.page.update()

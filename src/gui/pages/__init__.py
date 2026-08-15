@@ -9,3 +9,4 @@ from src.gui.pages.page_commands import PageCommands
 from src.gui.pages.page_dll import PageDll
 from src.gui.pages.page_settings import PageSettings
 from src.gui.pages.page_about import PageAbout
+from src.gui.pages.page_crash import PageCrash
