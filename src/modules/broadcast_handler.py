@@ -9,8 +9,10 @@ import time
 import urllib.request
 
 from config import SOURCE_NAME
-from src.core.runtime_config import toolkit_cfg
-from src.core.helpers import file_exists, run_sigle_cmd, get_ipv4_address
+from src.core.settings import toolkit_cfg
+from src.utils.cmd import run_sigle_cmd
+from src.utils.fs import file_exists
+from src.utils.network import get_ipv4_address
 from src.modules.killer import ensure_killer_running
 
 
@@ -34,7 +36,7 @@ def parse_screenrender_log():
     `Returns`
         `(bool, list)`: (是否找到, JSON 命令列表)
     """
-    from src.core.helpers import show_snack
+    from src.core.bridge import show_snack
     log_path = get_screenrender_log_path()
     if not log_path or not os.path.exists(log_path):
         show_snack(f"日志文件不存在: {log_path}")
@@ -91,7 +93,7 @@ def from_log_file_get_remote_cmd() -> str | None:
 def handin_save_yc_cmd(save_cmd, replace_ip=True) -> None:
     """保存广播命令到配置（JSON 格式）。
     自动把 local 字段替换为本地 IP。"""
-    from src.core.helpers import show_snack
+    from src.core.bridge import show_snack
 
     if replace_ip:
         data = _parse_json_cmd(save_cmd)
@@ -107,7 +109,7 @@ def handin_save_yc_cmd(save_cmd, replace_ip=True) -> None:
 def generate_remote_cmd_and_save(teacher_ip) -> None:
     """根据教师 IP 生成广播命令（JSON）并保存。
     组播地址映射: 教师 192.168.5.94 → remote 229.1.5.94"""
-    from src.core.helpers import show_snack
+    from src.core.bridge import show_snack
     local_ip = get_ipv4_address()
 
     remote_ip = "229.1.0.0"
@@ -178,7 +180,7 @@ def try_get_teacher_ip() -> str | None:
 
 
 def blow_teacher_client():
-    from src.core.helpers import show_snack
+    from src.core.bridge import show_snack
     ip = try_get_teacher_ip()
     if ip is None:
         show_snack("未获取到教师机IP")
@@ -234,7 +236,7 @@ def replace_screen_render() -> bool:
     """[已弃用] 替换 ScreenRender.exe 为 Helper 版本。
     真实参数通过共享内存传递且为 JSON，文件替换方案不可靠，
     请改用 日志监控 + 秒杀 + 窗口化重开 方案。"""
-    from src.utils.system.logger import debug
+    from src.utils.logger import debug
     filename = "ScreenRender_Helper.exe"
     nowcurhelper = os.path.join(os.getcwd(), filename)
     copypath = os.path.join(toolkit_cfg.oseasy_path, filename)
@@ -311,7 +313,7 @@ def force_screenrender_windowed() -> bool:
     """将当前 ScreenRender 窗口强制切换为窗口模式（不杀进程）。
     返回 True 表示成功找到窗口并切换。"""
     import ctypes
-    from src.utils.system.logger import info
+    from src.utils.logger import info
 
     user32 = ctypes.windll.user32
     GWL_STYLE = -16
@@ -347,7 +349,7 @@ _force_windowed = force_screenrender_windowed
 def force_screenrender_fullscreen() -> bool:
     """将当前 ScreenRender 窗口恢复全屏模式（去窗口装饰 + 覆盖屏幕）。"""
     import ctypes
-    from src.utils.system.logger import info
+    from src.utils.logger import info
 
     user32 = ctypes.windll.user32
     GWL_STYLE = -16

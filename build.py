@@ -177,87 +177,43 @@ def build_args():
     args.extend(["--hidden-import", "urllib.parse"])
 
     # 路径分隔符（Windows 用 ; ）
-    flet_datasep = ";" if os.name == "nt" else ":"
-
-    # 自动查找 flet 安装路径（兼容 venv / 系统全局 / pip install --user）
-    import flet as _flet_check
-    flet_path = Path(_flet_check.__path__[0])
-    flet_desktop_path = None
-    try:
-        import flet_desktop as _fd
-        flet_desktop_path = Path(_fd.__path__[0])
-    except ImportError:
-        pass
-
-    # flet 资源
-    if flet_path.exists():
-        args.extend(["--add-data", f"{flet_path}{flet_datasep}flet"])
-    if flet_desktop_path and flet_desktop_path.exists():
-        # 只打包解压后的桌面客户端目录 app/flet（运行时优先使用它），
-        # 排除同目录下的 app/flet-windows.zip：
-        #   运行时 __locate_and_unpack_flet_view 只在 app/flet/flet.exe 不存在时
-        #   才联网下载 zip，包内自带的 zip 永远不会被解压，纯属浪费 ~39MB。
-        fd_flet = flet_desktop_path / "app" / "flet"
-        if fd_flet.exists():
-            args.extend([
-                "--add-data",
-                f"{fd_flet}{flet_datasep}flet_desktop{os.sep}app{os.sep}flet",
-            ])
-        else:
-            # 兜底：没有解压版客户端则退回打包整个包
-            args.extend(["--add-data", f"{flet_desktop_path}{flet_datasep}flet_desktop"])
-    args.extend(["--hidden-import", "flet"])
-    args.extend(["--hidden-import", "flet_desktop"])
-
-    # ---- 内置 flet 桌面客户端（避免目标机首次运行在线下载） ----
-    # flet 运行时 __locate_and_unpack_flet_view 优先使用解压版
-    # flet_desktop/app/flet/flet.exe（已在上方打包），只有它不存在时才会
-    # 联网下载 flet-windows.zip。因此无需再打包任何 zip。
-    if flet_desktop_path and (flet_desktop_path / "app" / "flet" / "flet.exe").exists():
-        print("[内置客户端] 已打包解压版桌面客户端 (app/flet)，目标机可离线运行")
-    else:
-        print("[内置客户端] 未找到解压版桌面客户端 app/flet，目标机首次运行将在线下载")
-
-    if ICON_PATH and Path(ICON_PATH).exists():
-        args.extend(["--icon", ICON_PATH])
+    datasep = ";" if os.name == "nt" else ":"
 
     # ---- 添加数据文件（打包进 exe 的资源） ----
     args.extend(["--add-data", f"Fake_SCR.py{os.pathsep}."])
     args.extend(["--add-data", f"config.py{os.pathsep}."])
 
-    # 窗口/任务栏图标（供 flet 的 page.window.icon 在运行时使用）
+    # 窗口/任务栏图标
     if Path("logo.png").exists():
         args.extend(["--add-data", f"logo.png{os.pathsep}."])
-        print("[图标] 已打包 logo.png（窗口/任务栏图标）")
-    else:
-        print("[图标] 未找到 logo.png，窗口将使用 flet 默认图标")
+        print("[图标] 已打包 logo.png")
+    if Path("logo.ico").exists():
+        args.extend(["--add-data", f"logo.ico{os.pathsep}."])
+        print("[图标] 已打包 logo.ico")
 
     # ScreenRender_Helper.exe（如果存在）
     screen_helper = Path("ScreenRender_Helper.exe")
     if screen_helper.exists():
         args.extend(["--add-data", f"ScreenRender_Helper.exe{os.pathsep}."])
 
-    # ---- 其他隐藏导入 ----
+    # ---- 隐藏导入 ----
     extra_hidden = [
-        "flet_core", "flet_desktop", "flet_runtime",
         "pynput.keyboard._win32", "pynput.mouse._win32",
         "ctypes.wintypes", "psutil", "webbrowser",
+        "windows_toasts", "winrt.windows.data.xml.dom",
+        "winrt.windows.foundation", "winrt.windows.foundation.collections",
+        "winrt.windows.ui.notifications",
     ]
     for m in extra_hidden:
         args.extend(["--hidden-import", m])
 
     # ---- 排除不需要的大模块 ----
-    # 注意：email / urllib / ssl 不能排除，flet 依赖它们
     exclude_modules = [
-        "tkinter", "tcl", "tk",
         "matplotlib", "numpy", "pandas", "PIL",
         "PyQt5", "PyQt6", "PySide2", "PySide6", "wx",
         "IPython", "jupyter", "notebook",
         "pydoc", "unittest", "test",
         "setuptools", "pip",
-        # "email",      # ❌ flet runtime 需要
-        # "html",       # 可能 urllib 依赖
-        # "xml", "xmlrpc", "distutils", "lib2to3",
     ]
     for mod in exclude_modules:
         args.extend(["--exclude-module", mod])

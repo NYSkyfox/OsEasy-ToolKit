@@ -54,8 +54,8 @@ def run_easy_dll(
     - `after_run_func`: 运行完毕后的回调函数
 
     """
-    from src.core.runtime_config import toolkit_cfg
-    from src.core.helpers import show_snack
+    from src.core.settings import toolkit_cfg
+    from src.core.bridge import show_snack
 
     print("dllUse debug >", dll_name, func_name, return_type, argtypes, out_buffer)
 

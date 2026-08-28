@@ -1,8 +1,8 @@
-# src/utils/uac_elevator.py
+# src/utils/uac.py
 # UAC 提权模块：自动检测权限并提权（优先静默绕过，失败回退弹 UAC）
 #
 # 使用方式:
-#   from src.utils.system.uac_elevator import elevate
+#   from src.utils.uac import elevate
 #   elevate(__file__)
 #
 # 提权后会在环境变量 OSEASY_PRIV_METHOD 中记录方式:
@@ -15,7 +15,7 @@ import os
 import sys
 import ctypes
 
-from src.utils.system.logger import info, warn, error, exception, debug
+from src.utils.logger import info, warn, error, exception, debug
 
 PYTHON_EXE = sys.executable
 UAC_BYPASS_FLAG_FILE = "__uac_bypass__"            # fodhelper bypass 标记

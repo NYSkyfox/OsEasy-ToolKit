@@ -3,49 +3,11 @@
 
 import ctypes
 from ctypes import wintypes
-
-import flet as ft
+import tkinter as tk
+from tkinter import ttk
 
 from src.modules.dll_manager import run_easy_dll, easy_dll
-from src.core.runtime_config import toolkit_cfg
-from src.core.helpers import show_snack
-
-
-def query_all_control_status():
-    """同时查询 USB 和网络管控状态并汇总显示"""
-    msgs = []
-
-    # ---- USB 管控 ----
-    dll_path = toolkit_cfg.oseasy_path + "\\x64\\easyusbctrl.dll"
-    try:
-        dll_loader = easy_dll(dll_path)
-        runner = dll_loader.setup_function(
-            "EasyUsb_IsWorking",
-            restype=ctypes.c_int,
-            argtypes=[ctypes.POINTER(wintypes.DWORD)],
-        )
-        buf = wintypes.DWORD(0)
-        result = runner(buf)
-        msgs.append(f"USB管控: 返回值 {result}, 输出参数 {buf.value}")
-        if result != 0:
-            msgs.append(f"  → 错误: {dll_loader.get_error_message(result)}")
-    except Exception as e:
-        msgs.append(f"USB管控查询异常: {e}")
-
-    # ---- 网络管控 ----
-    try:
-        from src.core.helpers import run_sigle_cmd
-        import subprocess
-        result = subprocess.run(
-            ["sc", "query", "OeNetLimit"],
-            capture_output=True, text=True,
-        )
-        running = "RUNNING" in result.stdout
-        msgs.append(f"网络管控(OeNetLimit): {'已启用' if running else '未运行'}")
-    except Exception as e:
-        msgs.append(f"网络管控查询异常: {e}")
-
-    show_snack("\n".join(msgs))
+from src.core.settings import toolkit_cfg
 
 
 class PageDll:
@@ -55,40 +17,80 @@ class PageDll:
 
     def build(self):
         ui = self.ui
+        frame = ttk.Frame(ui.notebook)
 
-        ui.dll_usb_1 = ft.FilledTonalButton(
-            text="关闭USB管控",
-            on_click=lambda _: run_easy_dll("\\x64\\easyusbctrl.dll", "EasyUsb_StopWorking", ctypes.c_int, [], None),
-            icon=ft.Icons.USB,
-            tooltip="调用easyusbctrl.dll停止USB管控功能",
-        )
-        ui.dll_usb_2 = ft.FilledTonalButton(
-            text="启动USB管控",
-            on_click=lambda _: run_easy_dll("\\x64\\easyusbctrl.dll", "EasyUsb_StartWorking", ctypes.c_int, [], None),
-            icon=ft.Icons.USB_OFF,
-            tooltip="调用easyusbctrl.dll启动USB管控功能",
-        )
-        ui.dll_usb_3 = ft.FilledTonalButton(
-            text="查询管控状态",
-            on_click=lambda _: query_all_control_status(),
-            icon=ft.Icons.QUERY_STATS,
-            tooltip="查询USB管控和网络管控的当前启用状态",
-        )
-        ui.dll_net_1 = ft.FilledTonalButton(
-            text="开启网络管控",
-            on_click=lambda _: run_easy_dll("\\x64\\OeNetlimit.dll", "DisableInternet", ctypes.c_int, [], None),
-            icon=ft.Icons.SIGNAL_WIFI_CONNECTED_NO_INTERNET_4,
-            tooltip="调用OeNetlimit.dll开启网络管控限制",
-        )
-        ui.dll_net_2 = ft.FilledTonalButton(
-            text="关闭网络管控",
-            on_click=lambda _: run_easy_dll("\\x64\\OeNetlimit.dll", "EnableNet", ctypes.c_int, [], None),
-            icon=ft.Icons.SIGNAL_WIFI_4_BAR,
-            tooltip="调用OeNetlimit.dll关闭网络管控限制",
-        )
+        # ---- 上部：控件（可滚动） ----
+        _, ctrl_frame = ui.make_scrollable(frame)
 
-        return ft.Column(controls=[
-            ui.yiyanshowtext, ft.Divider(height=1),
-            ui.dll_usb_1, ui.dll_usb_2, ui.dll_usb_3,
-            ui.dll_net_1, ui.dll_net_2,
-        ])
+        usb_frame = ttk.LabelFrame(ctrl_frame, text="USB 管控", padding=5)
+        usb_frame.pack(fill=tk.X, pady=2)
+        btn1 = ttk.Button(usb_frame, text="关闭USB管控",
+                   command=lambda: run_easy_dll("\\x64\\easyusbctrl.dll", "EasyUsb_StopWorking", ctypes.c_int, [], None)
+                   )
+        btn1.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn1, "FUNC_DLL_USB_STOP")
+        btn2 = ttk.Button(usb_frame, text="启动USB管控",
+                   command=lambda: run_easy_dll("\\x64\\easyusbctrl.dll", "EasyUsb_StartWorking", ctypes.c_int, [], None)
+                   )
+        btn2.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn2, "FUNC_DLL_USB_START")
+
+        net_frame = ttk.LabelFrame(ctrl_frame, text="网络管控", padding=5)
+        net_frame.pack(fill=tk.X, pady=2)
+        btn3 = ttk.Button(net_frame, text="开启网络管控",
+                   command=lambda: run_easy_dll("\\x64\\OeNetlimit.dll", "DisableInternet", ctypes.c_int, [], None)
+                   )
+        btn3.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn3, "FUNC_DLL_NET_ENABLE")
+        btn4 = ttk.Button(net_frame, text="关闭网络管控",
+                   command=lambda: run_easy_dll("\\x64\\OeNetlimit.dll", "EnableNet", ctypes.c_int, [], None)
+                   )
+        btn4.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn4, "FUNC_DLL_NET_DISABLE")
+
+        query_frame = ttk.Frame(ctrl_frame)
+        query_frame.pack(fill=tk.X, pady=2)
+        btn5 = ttk.Button(query_frame, text="查询管控状态",
+                   command=self._query_status)
+        btn5.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn5, "FUNC_DLL_QUERY")
+
+        # ---- 下部：输出区域（固定底部） ----
+        output_frame = ttk.Frame(frame)
+        output_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=5, pady=2)
+        self.output_text = ui.make_output_text(output_frame, height=5)
+
+        return frame
+
+    def _query_status(self):
+        ui = self.ui
+        self.ui.clear_text(self.output_text)
+        self.ui.append_text(self.output_text, "正在查询管控状态...", ui.root)
+        msgs = []
+
+        dll_path = toolkit_cfg.oseasy_path + "\\x64\\easyusbctrl.dll"
+        try:
+            dll_loader = easy_dll(dll_path)
+            runner = dll_loader.setup_function(
+                "EasyUsb_IsWorking", restype=ctypes.c_int, argtypes=[ctypes.POINTER(wintypes.DWORD)],
+            )
+            buf = wintypes.DWORD(0)
+            result = runner(buf)
+            msgs.append(f"USB管控: 返回值 {result}, 输出参数 {buf.value}")
+            if result != 0:
+                msgs.append(f"  -> 错误: {dll_loader.get_error_message(result)}")
+        except Exception as e:
+            msgs.append(f"USB管控查询异常: {e}")
+
+        try:
+            import subprocess
+            # 不弹控制台窗口（避免打包为无控制台 exe 时闪现黑框）
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            result = subprocess.run(["sc", "query", "OeNetLimit"], capture_output=True, text=True, creationflags=flags)
+            running = "RUNNING" in result.stdout
+            msgs.append(f"网络管控(OeNetLimit): {'已启用' if running else '未运行'}")
+        except Exception as e:
+            msgs.append(f"网络管控查询异常: {e}")
+
+        for m in msgs:
+            self.ui.append_text(self.output_text, m, ui.root)

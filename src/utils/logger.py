@@ -1,4 +1,4 @@
-# src/utils/system/logger.py
+# src/utils/logger.py
 # 工具箱日志系统 — 从启动到关闭全生命周期记录
 # 设计要点：零外部依赖、UAC 提权前即可使用、线程安全
 

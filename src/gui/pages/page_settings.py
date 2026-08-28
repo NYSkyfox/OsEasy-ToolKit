@@ -2,11 +2,11 @@
 # 设置页（页面 5）
 
 import os
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
 
-import flet as ft
-
-from src.core.helpers import del_historyrem
-from src.utils.program.persistent_switch import PersistentSwitch
+from src.utils.fs import del_historyrem
+from src.gui.switch import PersistentSwitch
 
 
 class PageSettings:
@@ -14,28 +14,176 @@ class PageSettings:
     def __init__(self, ui):
         self.ui = ui
 
-    def _open_reset_dlg(self, *e):
-        self.ui.page.open(self._reset_dlg)
-        self.ui.page.update()
+    def build(self):
+        ui = self.ui
+        frame = ttk.Frame(ui.notebook)
 
-    def _close_reset_dlg(self, confirm):
-        self.ui.page.close(self._reset_dlg)
-        self.ui.page.update()
-        if confirm:
+        # 内容（可滚动）
+        _, inner = ui.make_scrollable(frame)
+
+        # 外观设置
+        appear_frame = ttk.LabelFrame(inner, text="外观设置", padding=5)
+        appear_frame.pack(fill=tk.X, pady=2)
+
+        btn1 = ttk.Button(appear_frame, text="切换背景图片",
+                   command=self._pick_bg)
+        btn1.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn1, "FUNC_SET_BG")
+        btn2 = ttk.Button(appear_frame, text="更换显示字体",
+                   command=self._pick_font)
+        btn2.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn2, "FUNC_SET_FONT")
+        btn3 = ttk.Button(appear_frame, text="加载外部一言文件",
+                   command=self._pick_yiyan)
+        btn3.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn3, "FUNC_SET_YIYAN")
+
+        ui.random_yiyan_swc = PersistentSwitch(
+            appear_frame,
+            config_key="random_yiyan_enabled",
+            label="随机一言",
+            on_toggle=ui.toggle_random_yiyan,
+        )
+        ui.random_yiyan_swc.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.random_yiyan_swc, "FUNC_SET_RANDOM_YIYAN")
+
+        # 背景不透明度
+        opacity_frame = ttk.LabelFrame(inner, text="背景不透明度", padding=5)
+        opacity_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        ui.bgtmd_var = tk.DoubleVar(value=ui.bgtmd)
+        opacity_scale = ttk.Scale(opacity_frame, from_=0, to=1.0, variable=ui.bgtmd_var,
+                                   orient=tk.HORIZONTAL, command=self._on_opacity_change)
+        opacity_scale.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(opacity_scale, "FUNC_SET_OPACITY")
+
+        # 快捷键
+        hk_frame = ttk.LabelFrame(inner, text="快捷键", padding=5)
+        hk_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        from src.gui.hotkey import get_hotkey_label
+        from src.utils.screenshot import get_scshot
+
+        ui.hide_tbox_swc = PersistentSwitch(
+            hk_frame,
+            config_key="hide_tbox_hotkey",
+            label=get_hotkey_label("hide_tbox") + " 隐&显工具箱",
+            default_value=True,
+            verifier=lambda: ui.hotkeyManager.is_registered_by_name("hide_tbox", ui.hide_toolkit_helper),
+            on_toggle=lambda _: ui._on_hide_tbox_changed(),
+        )
+        ui.hide_tbox_swc.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.hide_tbox_swc, "FUNC_HK_HIDE_TOOLKIT")
+
+        _screenshot_cb = lambda: ui._run_in_thread(get_scshot, "截图")
+        ui._scshot_callback = _screenshot_cb
+        ui.FastGetSC = PersistentSwitch(
+            hk_frame,
+            config_key="fast_screenshot_hotkey",
+            label=get_hotkey_label("fast_screenshot") + " 屏幕截图",
+            verifier=lambda: ui.hotkeyManager.is_registered_by_name("fast_screenshot", _screenshot_cb),
+            on_toggle=lambda _: ui._on_fast_screenshot_changed(),
+        )
+        ui.FastGetSC.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.FastGetSC, "FUNC_FAST_SCREENSHOT")
+
+        # 窗口
+        win_frame = ttk.LabelFrame(inner, text="窗口", padding=5)
+        win_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        ui.topmost_swc = PersistentSwitch(
+            win_frame,
+            config_key="topmost_enabled",
+            label="置顶本窗口",
+            on_toggle=ui._on_topmost_changed,
+        )
+        ui.topmost_swc.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.topmost_swc, "FUNC_SET_TOPMOST")
+
+        # Toast 通知
+        ui.toast_swc = PersistentSwitch(
+            win_frame,
+            config_key="toast_notification_enabled",
+            label="Windows Toast 通知（部分操作时弹桌面通知）",
+            on_toggle=self._on_toast_toggle,
+        )
+        ui.toast_swc.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.toast_swc, "FUNC_SET_TOAST")
+
+        # 重置
+        reset_frame = ttk.LabelFrame(inner, text="重置", padding=5)
+        reset_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        btn_reset = ttk.Button(reset_frame, text="重置工具箱设置",
+                   command=self._confirm_reset)
+        btn_reset.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn_reset, "FUNC_SET_RESET")
+
+        return frame
+
+    def _on_toast_toggle(self, e=None):
+        self.ui._toast_enabled = e.value
+
+    def _pick_bg(self):
+        path = filedialog.askopenfilename(
+            title="选择背景图片",
+            filetypes=[("图片文件", "*.png *.jpg *.jpeg *.bmp *.gif"), ("所有文件", "*.*")]
+        )
+        if path:
+            self.ui.bgpath = path
+            self.ui.loaded_bg = True
+            from src.core.settings import toolkit_cfg
+            toolkit_cfg.set_style_path("bgPath", path)
+            self.ui.show_snakemessage("背景图片已设置")
+
+    def _pick_font(self):
+        path = filedialog.askopenfilename(
+            title="选择字体文件",
+            filetypes=[("TrueType 字体", "*.ttf"), ("所有文件", "*.*")]
+        )
+        if path:
+            self.ui.zdy_fontpath = path
+            from src.core.settings import toolkit_cfg
+            toolkit_cfg.set_style_path("fontPath", path)
+            self.ui.show_snakemessage("字体文件已加载（需重启生效）")
+
+    def _pick_yiyan(self):
+        path = filedialog.askopenfilename(
+            title="选择一言文件",
+            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")]
+        )
+        if path:
+            self.ui.yiyanfpath = path
+            self.ui.from_file_load_yiyan()
+
+    def _on_opacity_change(self, val):
+        self.ui.bgtmd = float(val)
+        from src.core.settings import toolkit_cfg
+        toolkit_cfg.set_config_key_data("bg_opacity", self.ui.bgtmd)
+
+    def _confirm_reset(self):
+        if messagebox.askyesno(
+            "重置工具箱设置",
+            "将清除以下内容：\n"
+            "  • 外观设置（背景/字体/一言）\n"
+            "  • 配置文件 (config.json)\n"
+            "  • IFEO 注册表劫持项\n"
+            "  • 所有已生成的脚本 (.bat/.ps1)\n"
+            "  • 所有日志文件 (.log)\n\n"
+            "下次启动恢复默认设置。\n\n确认继续？"
+        ):
             self._do_reset()
 
     def _do_reset(self):
-        """重置工具箱：清除外观设置 + 配置文件 + IFEO劫持 + 清理日志 + 删除已生成脚本"""
         ui = self.ui
-        # 1. 清理数据文件
         del_historyrem()
-        from src.core.runtime_config import toolkit_cfg
+        from src.core.settings import toolkit_cfg
         try:
             os.remove(toolkit_cfg.config_file_path)
         except FileNotFoundError:
             pass
-        toolkit_cfg._data_cache = None  # 清空内存缓存，强制下次重读
-        from src.utils.system.ifeo import remove_ifeo_debugger
+        toolkit_cfg._data_cache = None
+        from src.utils.ifeo import remove_ifeo_debugger
         for exe in ("sethc.exe", "shutdown.exe", "Student.exe"):
             remove_ifeo_debugger(exe)
         from src.modules.file_handler import del_self_cmd_files
@@ -47,7 +195,6 @@ class PageSettings:
                 os.remove(f)
             except OSError:
                 pass
-        # 2. 热重载 UI 状态到默认值
         ui.loaded_bg = False
         ui.bgtmd = 0.6
         ui.bgpath = ""
@@ -55,104 +202,6 @@ class PageSettings:
         ui.zdy_fontpath = ""
         ui.font_loadtime = 1
         ui.random_yy_enabled = False
-        ui.follow_system_accent = True
-        ui.theme_mode_key = "system"
-        from src.utils.system.win_utils import get_windows_accent_color
-        ui.accent_color = get_windows_accent_color()
-        ui.set_theme_mode()
         ui.pick_a_random_yiyan()
         toolkit_cfg.set_config_key_data("theme_mode", "system")
-        # 3. 刷新界面
-        from config import DEFAULT_ACCENT_COLOR
-        ui.page.theme = ui.page.theme.__class__(
-            font_family=ui.page.theme.font_family,
-            color_scheme_seed=ui.accent_color,
-        )
-        ui.page.theme_mode = ft.ThemeMode.SYSTEM if hasattr(ft.ThemeMode, "SYSTEM") else ft.ThemeMode.LIGHT
-        ui.selPages_Helper(int(ui.NowSelIndex))
         ui.show_snakemessage("工具箱已重置，设置已恢复默认值")
-
-    def build(self):
-        ui = self.ui
-
-        self._reset_dlg = ft.AlertDialog(
-            modal=True, title=ft.Text("重置工具箱设置"),
-            content=ft.Text(
-                "将清除以下内容：\n"
-                "  • 外观设置（背景/字体/一言）\n"
-                "  • 配置文件 (config.json)\n"
-                "  • IFEO 注册表劫持项\n"
-                "  • 所有已生成的脚本 (.bat/.ps1)\n"
-                "  • 所有日志文件 (.log)\n\n"
-                "下次启动恢复默认设置。"
-            ),
-            actions=[
-                ft.TextButton("确认重置", on_click=lambda _: self._close_reset_dlg(True)),
-                ft.TextButton("取消", on_click=lambda _: self._close_reset_dlg(False)),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-
-        ui.bgfilepick = ft.ElevatedButton(
-            "切换背景图片",
-            icon=ft.Icons.UPLOAD_FILE,
-            on_click=lambda _: ui.pick_files_dialog.pick_files(
-                allow_multiple=False, file_type="IMAGE"
-            ),
-            tooltip="选择一张图片作为工具箱背景",
-        )
-        ui.zitibtn = ft.ElevatedButton(
-            "更换显示字体",
-            icon=ft.Icons.UPLOAD_SHARP,
-            on_click=lambda _: ui.font_pick_files_dialog.pick_files(
-                allow_multiple=False, allowed_extensions=["ttf"]
-            ),
-            tooltip="选择TTF字体文件替换工具箱显示字体",
-        )
-        ui.yiyanbtn = ft.ElevatedButton(
-            "加载外部一言文件",
-            icon=ft.Icons.UPLOAD_SHARP,
-            on_click=lambda _: ui.yiyan_pick_files_dialog.pick_files(
-                allow_multiple=False, allowed_extensions=["txt"]
-            ),
-            tooltip="加载TXT文件作为自定义一言列表（每行一句）",
-        )
-        ui.random_yiyan_swc = PersistentSwitch(
-            config_key="random_yiyan_enabled",
-            label="随机一言",
-            on_toggle=ui.toggle_random_yiyan,
-        )
-        ui.remove_rem = ft.ElevatedButton(
-            "重置工具箱设置",
-            icon=ft.Icons.DELETE_OUTLINE,
-            on_click=self._open_reset_dlg,
-            tooltip="清除外观设置、删除日志文件和已生成的脚本",
-        )
-        ui.theme_dropdown = ft.Dropdown(
-            label="主题模式",
-            value=ui.theme_mode_key,
-            on_change=ui.set_theme_mode,
-            options=[
-                ft.dropdown.Option("system", "跟随系统"),
-                ft.dropdown.Option("light", "浅色模式"),
-                ft.dropdown.Option("dark", "深色模式"),
-            ],
-        )
-        ui.system_accent_swc = PersistentSwitch(
-            config_key="follow_system_accent",
-            label="系统主题颜色",
-            default_value=True,
-            on_toggle=ui.toggle_system_accent,
-        )
-        ui.bgtmd_text = ft.Text("滑动以调整背景图片不透明度")
-        ui.bgtmdb = ft.Slider(
-            min=0.0, max=1.0, divisions=10, value=ui.bgtmd,
-            on_change_end=ui.change_bg_btmd, disabled=not ui.loaded_bg,
-        )
-
-        return ft.Column(controls=[
-            ui.yiyanshowtext, ft.Divider(height=1),
-            ui.theme_dropdown, ui.system_accent_swc, ui.random_yiyan_swc, ui.remove_rem, ui.zitibtn,
-            ui.bgfilepick, ui.bgtmd_text, ui.bgtmdb, ui.yiyanbtn,
-            ui.hide_tbox_swc,
-        ])

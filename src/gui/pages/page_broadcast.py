@@ -1,17 +1,21 @@
 # src/gui/pages/page_broadcast.py
 # 广播管理页（页面 2）
 
+import tkinter as tk
+from tkinter import ttk, messagebox
 import time
+import threading
 
-import flet as ft
-
-from src.core.helpers import run_sigle_cmd
-from src.utils.program.hotkey_manager import get_hotkey_label
-from src.utils.program.persistent_switch import PersistentSwitch
+from src.utils.cmd import run_sigle_cmd
+from src.gui.hotkey import get_hotkey_label
+from src.gui.switch import PersistentSwitch
 from src.modules.broadcast_handler import (
     replace_screen_render, restone_screen_render,
     check_replace_screen_render_status,
     force_screenrender_windowed,
+    save_now_broadcast_cmd, extract_yc_cmd_from_log,
+    handin_save_yc_cmd, generate_remote_cmd_and_save,
+    start_log_monitor, stop_log_monitor, is_log_monitor_running,
 )
 from src.modules.service_manager import auto_stop_mmpc_if_needed
 
@@ -21,107 +25,152 @@ class PageBroadcast:
     def __init__(self, ui):
         self.ui = ui
 
-    def _close_readme_dlg(self):
-        ui = self.ui
-        if hasattr(self, '_readme_dlg'):
-            ui.page.close(self._readme_dlg)
-        ui.show_snakemessage("Have Fun")
-        ui.page.update()
-
-    def _build_readme_dlg(self):
-        return ft.AlertDialog(
-            modal=True, title=ft.Text("控屏管理页使用说明"),
-            content=ft.Text(
-                "在使用前请先使用解锁键盘锁&删除控屏锁定程序功能\n"
-                "点击替换拦截程序后再恢复控屏软件\n"
-                "等待老师控制屏幕后即完成拦截远程命令\n"
-                "完成替换后即可重新删除控屏软件\n"
-                "此时当老师处于控制状态时你可以主动运行命令弹出窗口化共享屏幕\n"
-                "实现自由的同时不影响听课!!\n"
-                "当老师来时你可以使用快捷键启动全屏参数的控制\n"
-                "等待老师走后再用快捷键清理进程"
-            ),
-            actions=[ft.TextButton("晓得了", on_click=lambda _: self._close_readme_dlg())],
-            actions_alignment=ft.MainAxisAlignment.END,
-            on_dismiss=lambda _: self._close_readme_dlg(),
-        )
-
-    def _open_readme_dlg(self, *e):
-        self._readme_dlg = self._build_readme_dlg()
-        self.ui.page.open(self._readme_dlg)
-        self.ui.page.update()
-
     def build(self):
         ui = self.ui
+        frame = ttk.Frame(ui.notebook)
 
-        ui.col_readme_dig = ft.FilledButton(
-            "点我查看此页面的使用说明",
-            on_click=self._open_readme_dlg,
-            tooltip="查看广播管理页的详细使用说明和操作指引",
-        )
+        # ---- 上部：控件（可滚动） ----
+        _, ctrl_frame = ui.make_scrollable(frame)
 
-        ui.replace_status = ft.TextField(
-            label="替换程序状态", value="未知 (点我更新状态)",
-            read_only=True, on_focus=self.update_replace_status,
-            text_align=ft.TextAlign.CENTER,
-        )
+        info_frame = ttk.Frame(ctrl_frame)
+        info_frame.pack(fill=tk.X, pady=2)
+        btn_readme = ttk.Button(info_frame, text="点我查看此页面的使用说明",
+                   command=self._show_readme)
+        btn_readme.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn_readme, "FUNC_BC_README")
 
-        ui.tihuan_scr = ft.FilledTonalButton(
-            text="替换拦截命令程序", on_click=self.replace_SCR_loj,
-            icon=ft.Icons.FIND_REPLACE,
-            tooltip="用自定义程序替换噢易屏幕广播拦截命令程序",
-        )
-        ui.try_read_sharecmd = ft.FilledTonalButton(
-            text="运行窗口化广播命令", on_click=self.run_win_gbcmd_loj,
-            icon=ft.Icons.WINDOW_SHARP,
-            tooltip="以窗口模式运行教师端屏幕广播命令",
-        )
-        ui.RunFullSC_btn = ft.FilledTonalButton(
-            "运行全屏广播命令",
-            on_long_press=lambda _: ui.direct_run_fullscreen_broadcast_cmd(),
-            icon=ft.Icons.FULLSCREEN,
-            tooltip="长按以全屏模式运行教师端屏幕广播命令",
-        )
-        ui.KillSCR_btn = ft.FilledTonalButton(
-            "杀屏幕广播进程", icon=ft.Icons.BACK_HAND_OUTLINED,
-            on_click=ui.direct_kill_screen_render,
-            tooltip="强制结束所有ScreenRender屏幕广播进程",
-        )
-        ui.restone_scr = ft.FilledTonalButton(
-            text="恢复原有屏幕广播程序", on_click=self.restone_SCR_loj,
-            icon=ft.Icons.RESTORE_PAGE,
-            tooltip="恢复被替换的原始屏幕广播程序文件",
-        )
+        status_frame = ttk.LabelFrame(ctrl_frame, text="替换状态", padding=5)
+        status_frame.pack(fill=tk.X, pady=2)
+        ui.replace_status = tk.StringVar(value="未知 (点我更新状态)")
+        status_entry = ttk.Entry(status_frame, textvariable=ui.replace_status, state="readonly", justify=tk.CENTER)
+        status_entry.pack(fill=tk.X, padx=2, pady=2)
+        status_entry.bind("<FocusIn>", self.update_replace_status)
+        ui.bind_tooltip(status_entry, "FUNC_BC_REPLACE_STATUS")
+
+        bc_frame = ttk.LabelFrame(ctrl_frame, text="广播操作", padding=5)
+        bc_frame.pack(fill=tk.X, pady=2)
+        btn1 = ttk.Button(bc_frame, text="替换拦截命令程序", command=self.replace_SCR_loj)
+        btn1.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn1, "FUNC_BC_REPLACE_SCR")
+        btn2 = ttk.Button(bc_frame, text="运行窗口化广播命令", command=self.run_win_gbcmd_loj)
+        btn2.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn2, "FUNC_BC_WIN_BROADCAST")
+        fullsc_btn = ttk.Button(bc_frame, text="运行全屏广播命令（长按）")
+        fullsc_btn.pack(fill=tk.X, padx=2, pady=2)
+        fullsc_btn.bind("<Button-1>", lambda e: self._start_long_press(e, fullsc_btn))
+        fullsc_btn.bind("<ButtonRelease-1>", lambda e: self._stop_long_press())
+        ui.bind_tooltip(fullsc_btn, "FUNC_BC_FULLSC_BROADCAST")
+        btn3 = ttk.Button(bc_frame, text="杀屏幕广播进程", command=ui.direct_kill_screen_render)
+        btn3.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn3, "FUNC_BC_KILL_SCR")
+        btn4 = ttk.Button(bc_frame, text="恢复原有屏幕广播程序", command=self.restone_SCR_loj)
+        btn4.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn4, "FUNC_BC_RESTORE_SCR")
+
+        hk_frame = ttk.LabelFrame(ctrl_frame, text="快捷键", padding=5)
+        hk_frame.pack(fill=tk.X, pady=2)
         ui.runwindows_swc = PersistentSwitch(
-            config_key="run_window_broadcast_hotkey",
+            hk_frame, config_key="run_window_broadcast_hotkey",
             label=get_hotkey_label("run_window_broadcast") + " 运行窗口屏幕广播",
             verifier=lambda: ui.hotkeyManager.is_registered_by_name("run_window_broadcast", self.run_win_gbcmd_loj),
             on_toggle=lambda _: ui._on_run_window_broadcast_changed(),
         )
+        ui.runwindows_swc.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.runwindows_swc, "FUNC_HK_WIN_BROADCAST")
         ui.KillSCR_swc = PersistentSwitch(
-            config_key="kill_screen_render_hotkey",
+            hk_frame, config_key="kill_screen_render_hotkey",
             label=get_hotkey_label("kill_screen_render") + " 杀屏幕广播进程",
             verifier=lambda: ui.hotkeyManager.is_registered_by_name("kill_screen_render", ui.direct_kill_screen_render),
             on_toggle=lambda _: ui._on_kill_screen_render_changed(),
         )
+        ui.KillSCR_swc.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.KillSCR_swc, "FUNC_HK_KILL_SCR")
         ui.RunFullSC_swc = PersistentSwitch(
-            config_key="run_fullscreen_broadcast_hotkey",
+            hk_frame, config_key="run_fullscreen_broadcast_hotkey",
             label=get_hotkey_label("run_fullscreen_broadcast") + " 运行广播命令",
             verifier=lambda: ui.hotkeyManager.is_registered_by_name("run_fullscreen_broadcast", ui.direct_run_fullscreen_broadcast_cmd),
             on_toggle=lambda _: ui._on_run_fullscreen_broadcast_changed(),
         )
-
+        ui.RunFullSC_swc.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.RunFullSC_swc, "FUNC_HK_FULLSC_BROADCAST")
         ui._restore_broadcast_hotkeys()
 
-        return ft.Column([
-            ui.yiyanshowtext, ft.Divider(height=1),
-            ui.col_readme_dig, ui.replace_status,
-            ui.tihuan_scr, ui.try_read_sharecmd, ui.RunFullSC_btn,
-            ui.KillSCR_btn, ui.restone_scr,
-            ui.runwindows_swc, ui.KillSCR_swc, ui.RunFullSC_swc,
-        ])
+        # ---- 远程广播命令 ----
+        cmd_frame = ttk.LabelFrame(ctrl_frame, text="远程广播命令", padding=5)
+        cmd_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(cmd_frame, text="教师机IP地址:").pack(anchor=tk.W, padx=2)
+        ui.teachIp_input = ttk.Entry(cmd_frame)
+        ui.teachIp_input.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(ui.teachIp_input, "FUNC_CMD_TEACH_IP")
+        btn_gen = ttk.Button(cmd_frame, text="由教师机IP生成远程命令",
+                   command=lambda: generate_remote_cmd_and_save(ui.teachIp_input.get()))
+        btn_gen.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn_gen, "FUNC_CMD_GEN_BY_IP")
+        ttk.Label(cmd_frame, text="完整远程广播命令:").pack(anchor=tk.W, padx=2, pady=(5, 0))
+        ui.conl_save_ycCmd_input = ttk.Entry(cmd_frame)
+        ui.conl_save_ycCmd_input.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(ui.conl_save_ycCmd_input, "FUNC_CMD_REMOTE_CMD")
+        btn_auto = ttk.Button(cmd_frame, text="自动替换本地IP并更新命令",
+                   command=lambda: handin_save_yc_cmd(ui.conl_save_ycCmd_input.get(), True))
+        btn_auto.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn_auto, "FUNC_CMD_AUTO_REPLACE_IP")
+        btn_manual = ttk.Button(cmd_frame, text="手动更新完整远程广播命令",
+                   command=lambda: handin_save_yc_cmd(ui.conl_save_ycCmd_input.get(), False))
+        btn_manual.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn_manual, "FUNC_CMD_MANUAL_SAVE")
 
-    # ---- 回调 ----
+        log_frame = ttk.LabelFrame(ctrl_frame, text="日志操作", padding=5)
+        log_frame.pack(fill=tk.X, pady=2)
+        btn_extract = ttk.Button(log_frame, text="从日志文件获取远程命令",
+                   command=lambda: extract_yc_cmd_from_log())
+        btn_extract.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn_extract, "FUNC_CMD_EXTRACT_LOG")
+        btn_read = ttk.Button(log_frame, text="读取已拦截的广播命令",
+                   command=self.dev_read_lj_cmd_loj)
+        btn_read.pack(fill=tk.X, padx=2, pady=2)
+        ui.bind_tooltip(btn_read, "FUNC_CMD_READ_INTERCEPTED")
+
+        mon_frame = ttk.LabelFrame(ctrl_frame, text="自动监控", padding=5)
+        mon_frame.pack(fill=tk.X, pady=2)
+        ui.monitor_swc = PersistentSwitch(
+            mon_frame, config_key="log_monitor_enabled",
+            label="自动监控广播日志 (全屏自动转窗口)",
+            live_getter=is_log_monitor_running, verifier=is_log_monitor_running,
+            on_toggle=self._on_monitor_toggle,
+        )
+        ui.monitor_swc.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(ui.monitor_swc, "FUNC_CMD_MONITOR")
+
+        # ---- 下部：输出区域（固定底部） ----
+        output_frame = ttk.Frame(frame)
+        output_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=5, pady=2)
+        self.output_text = ui.make_output_text(output_frame, height=5)
+
+        return frame
+
+    def _show_readme(self):
+        messagebox.showinfo(
+            "控屏管理页使用说明",
+            "在使用前请先使用解锁键盘锁&删除控屏锁定程序功能\n"
+            "点击替换拦截程序后再恢复控屏软件\n"
+            "等待老师控制屏幕后即完成拦截远程命令\n"
+            "完成替换后即可重新删除控屏软件\n"
+            "此时当老师处于控制状态时你可以主动运行命令弹出窗口化共享屏幕\n"
+            "实现自由的同时不影响听课!!\n"
+            "当老师来时你可以使用快捷键启动全屏参数的控制\n"
+            "等待老师走后再用快捷键清理进程"
+        )
+
+    def _start_long_press(self, event, btn):
+        self._long_press_timer = threading.Timer(0.5, self._do_long_press)
+        self._long_press_timer.start()
+
+    def _stop_long_press(self):
+        if hasattr(self, '_long_press_timer') and self._long_press_timer:
+            self._long_press_timer.cancel()
+
+    def _do_long_press(self):
+        self.ui.direct_run_fullscreen_broadcast_cmd()
 
     def run_win_gbcmd_loj(self, *e):
         ui = self.ui
@@ -156,8 +205,26 @@ class PageBroadcast:
         ui = self.ui
         if check_replace_screen_render_status():
             ui.show_snakemessage("检测到目录下已有ScreenRender_Y.exe")
-            ui.replace_status.value = "已替换"
+            ui.replace_status.set("已替换")
         else:
             ui.show_snakemessage("未检测到ScreenRender_Y.exe\n也许未执行替换或替换过程被打断")
-            ui.replace_status.value = "未替换"
-        ui.page.update()
+            ui.replace_status.set("未替换")
+
+    # ---- 以下为原广播命令页 (PageCommands) 方法 ----
+
+    def _on_monitor_toggle(self, e=None):
+        ui = self.ui
+        if e.value:
+            start_log_monitor(auto_windowed=True)
+            ui.show_snakemessage("广播日志监控已启动")
+        else:
+            stop_log_monitor()
+            ui.show_snakemessage("广播日志监控已停止")
+
+    def dev_read_lj_cmd_loj(self, *e):
+        ui = self.ui
+        status = save_now_broadcast_cmd()
+        if not status:
+            ui.show_snakemessage("未拦截到控制命令参数")
+        else:
+            ui.show_snakemessage("保存拦截命令成功")

@@ -1,4 +1,4 @@
-# src/utils/win_utils.py
+# src/utils/display.py
 # Windows 系统工具函数
 
 import os
@@ -17,9 +17,9 @@ def resource_path(relative: str) -> str:
     if getattr(sys, "frozen", False):
         base = sys._MEIPASS
     else:
-        # 本文件位于 src/utils/system/win_utils.py → 上溯 4 层到项目根
+        # 本文件位于 src/utils/display.py → 上溯 3 层到项目根
         base = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         )
     return os.path.join(base, relative)
 

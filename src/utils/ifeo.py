@@ -3,7 +3,7 @@
 
 import subprocess
 
-from src.utils.system.cmd import run_sigle_cmd
+from src.utils.cmd import run_sigle_cmd
 
 # IFEO 注册表父键路径
 IFEO_BASE_KEY = r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options"
@@ -42,6 +42,8 @@ def query_ifeo_debugger(exe_name: str) -> str | None:
             shell=True,
             capture_output=True,
             text=True,
+            # 不弹控制台窗口（避免打包为无控制台 exe 时闪现黑框）
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         if "Debugger" not in result.stdout:
             return None

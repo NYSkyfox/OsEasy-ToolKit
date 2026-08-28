@@ -1,4 +1,4 @@
-# src/utils/program/hotkey_manager.py
+# src/gui/hotkey.py
 # 快捷键管理中心
 
 import threading
@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from pynput import keyboard
 
-from src.utils.system.logger import debug
+from src.utils.logger import debug
 
 # ══════════════════════════════════════════════════════════
 # 快捷键定义注册表 —— 所有热键在此集中管理

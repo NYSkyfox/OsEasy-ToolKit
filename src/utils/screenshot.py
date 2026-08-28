@@ -1,4 +1,4 @@
-# src/utils/program/screenshot.py
+# src/utils/screenshot.py
 # 截图工具 —— 纯 GDI 截屏，零第三方依赖，保存 PNG + 写剪贴板 + 系统通知
 
 import os
@@ -7,13 +7,13 @@ import struct
 import zlib
 from ctypes import wintypes
 
-from src.core.helpers import get_time_str
+from src.utils.fs import get_time_str
 
 
 def get_scshot() -> None:
     """保存一张屏幕截图到用户数据目录的 Screenshots/，并复制到剪贴板（纯 GDI，零依赖）"""
     from src.core.constants import screenshot_path
-    from src.utils.system.logger import debug
+    from src.utils.logger import debug
 
     user32 = ctypes.windll.user32
     gdi32 = ctypes.windll.gdi32
@@ -147,19 +147,14 @@ def get_scshot() -> None:
             if hmem:
                 kernel32.GlobalFree(hmem)
 
-        # ---- 系统通知（Windows 原生 Toast，右上角弹出）----
-        try:
-            from winotify import Notification
-            toast = Notification(
-                app_id="OsEasy-ToolKit",
-                title="截图已保存",
-                msg=clip_msg or "图片已保存",
-                duration="short",
-            )
-            toast.show()
+        # ---- 系统通知（Windows 原生 Toast，点击可打开图片）----
+        from src.utils.toast import send_toast
+        from pathlib import Path
+        launch_uri = Path(mix_name).as_uri() if os.path.exists(mix_name) else ""
+        if send_toast(title="截图已保存", msg=(clip_msg or "图片已保存") + "\n单击此处打开截图", launch=launch_uri):
             debug("系统通知已发送")
-        except Exception as _e:
-            debug(f"通知发送失败: {_e}")
+        else:
+            debug("通知发送失败")
 
     finally:
         if hdc_mem:

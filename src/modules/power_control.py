@@ -3,9 +3,9 @@
 
 import os
 
-from src.core.runtime_config import toolkit_cfg
-from src.core.helpers import show_snack
-from src.utils.system.ifeo import add_ifeo_debugger, remove_ifeo_debugger, query_ifeo_debugger
+from src.core.settings import toolkit_cfg
+from src.core.bridge import show_snack
+from src.utils.ifeo import add_ifeo_debugger, remove_ifeo_debugger, query_ifeo_debugger
 
 
 def _get_fake_shutdown_path():
@@ -18,7 +18,7 @@ def _ensure_fake_shutdown_bat():
     """生成假体 bat：什么都不做，直接退出"""
     path = _get_fake_shutdown_path()
     # 内容：静默退出，code 0 表示"成功"让远程端以为命令已执行
-    content = "@echo off\r\necho 已为您拦截教师端的远程重启\r\ntimeout /t 5 /nobreak >nul\r\nexit /b 0\r\n"
+    content = "@echo off\r\necho 已为您拦截教师端的远程关机\r\ntimeout /t 5 /nobreak >nul\r\nexit /b 0\r\n"
     with open(path, "w", encoding="gbk") as f:
         f.write(content)
     return path
@@ -26,22 +26,22 @@ def _ensure_fake_shutdown_bat():
 
 def hijack_shutdown():
     """劫持 shutdown.exe，使远程重启命令失效"""
-    from src.utils.system.logger import info
+    from src.utils.logger import info
     fake_path = _ensure_fake_shutdown_bat()
     add_ifeo_debugger("shutdown.exe", fake_path)
-    info("已劫持 shutdown.exe，远程重启将被拦截")
-    show_snack("已劫持 shutdown.exe，远程重启将被拦截")
+    info("已劫持 shutdown.exe，远程关机将被拦截")
+    show_snack("已劫持 shutdown.exe，远程关机将被拦截")
 
 
 def release_shutdown_hijack():
     """解除 shutdown.exe 劫持"""
-    from src.utils.system.logger import info
+    from src.utils.logger import info
     remove_ifeo_debugger("shutdown.exe")
     fake_path = _get_fake_shutdown_path()
     if os.path.isfile(fake_path):
         os.remove(fake_path)
-    info("已解除 shutdown.exe 劫持")
-    show_snack("已解除 shutdown.exe 劫持")
+    info("已解除 shutdown.exe 劫持，远程关机恢复正常")
+    show_snack("已解除 shutdown.exe 劫持，远程关机恢复正常")
 
 
 def is_shutdown_hijacked():
@@ -102,8 +102,9 @@ def hijack_student_restart():
     2. 注册 IFEO: Student.exe → launcher.bat
     3. launcher 摘除 SeShutdownPrivilege 后启动 Student_Real.exe
     """
-    from src.utils.system.logger import info
-    from src.core.helpers import run_sigle_cmd, file_exists
+    from src.utils.logger import info
+    from src.utils.cmd import run_sigle_cmd
+    from src.utils.fs import file_exists
 
     student_path = os.path.join(toolkit_cfg.oseasy_path, "Student.exe")
     real_path = os.path.join(toolkit_cfg.oseasy_path, "Student_Real.exe")
@@ -123,7 +124,7 @@ def hijack_student_restart():
 
 def release_student_hijack():
     """解除 Student.exe IFEO 劫持"""
-    from src.utils.system.logger import info
+    from src.utils.logger import info
     remove_ifeo_debugger("Student.exe")
     bat_path = _get_student_launcher_bat()
     if os.path.isfile(bat_path):

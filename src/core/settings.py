@@ -4,7 +4,7 @@
 import json
 import os
 from config import CONFIG_FILE_PATH_TEMPLATE, DEFAULT_OSEASY_PATH, DEFAULT_STUDENT_EXE_NAME
-from src.core.helpers import file_exists, get_time_str
+from src.utils.fs import file_exists, get_time_str
 
 _username = os.environ.get('USERNAME') or 'Default'
 
@@ -15,6 +15,7 @@ class RuntimeConfig:
     def __init__(self):
         self.config_file_path = CONFIG_FILE_PATH_TEMPLATE.format(username=_username)
         self.student_version = 0
+        self.student_version_str = ""  # 精确版本字符串，如 "V10.9.1.5145"（读取 version 文件得到）
         self.oseasypath_have_been_modified = False
         self.student_exe_name = DEFAULT_STUDENT_EXE_NAME
         self.oseasy_path = DEFAULT_OSEASY_PATH

@@ -1,4 +1,4 @@
-# src/utils/web/network.py
+# src/utils/network.py
 # 网络工具
 
 import socket

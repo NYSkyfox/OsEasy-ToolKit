@@ -1,47 +1,26 @@
 # src/gui/app.py
-# 工具箱主 UI 类 — 框架 + 通用方法
+# 工具箱主 UI 类 — 框架 + 通用方法（ttk 版）
 
 import os
 import time
 import random
+import threading
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
 
-import flet as ft
+from config import APP_VERSION, RELEASE_NAME, DEFAULT_YIYAN_LIST, DEFAULT_SHOW_YIYAN
 
-from config import APP_VERSION, RELEASE_NAME, DEFAULT_YIYAN_LIST, DEFAULT_SHOW_YIYAN, DEFAULT_ACCENT_COLOR
+from src.core.settings import toolkit_cfg
+from src.core.bridge import pass_ui_class
 
-from src.core.runtime_config import toolkit_cfg
-from src.core.helpers import pass_ui_class, run_sigle_cmd
-from src.modules.service_manager import detect_student_version
-from src.modules.process_manager import utils, get_scshot
-
-from src.modules.broadcast_handler import (
-    from_log_file_get_remote_cmd, force_screenrender_fullscreen,
-)
-
-from src.utils.program.hotkey_manager import hotkey_manager, HOTKEY_DEFS, get_hotkey_keys, get_hotkey_label
-from src.utils.program.persistent_switch import PersistentSwitch
+from src.gui.hotkey import hotkey_manager, get_hotkey_label
+from src.gui.switch import PersistentSwitch
+from src.gui.widgets import make_scrollable, make_output_text, append_text, clear_text
 from src.gui.pages import (
-    PageProcess, PageOther, PageUnlock, PageBackup, PageBroadcast, PageCommands,
-    PageDll, PageSettings, PageAbout, PageCrash,
+    PageOverview, PageProcess, PageService, PageUnlock, PageBackup, PageBroadcast,
+    PageDll, PageSettings, PageAbout, PageAdvanced,
 )
-from src.utils.system.win_utils import get_windows_accent_color, get_windows_default_font, resource_path
-
-# 配置文件中保存的设置 key 名
-_SETTING_KEYS = {
-    "theme_mode": "theme_mode",
-    "follow_system_accent": "follow_system_accent",
-    "random_yiyan": "random_yiyan_enabled",
-    "bg_opacity": "bg_opacity",
-    "hide_tbox": "hide_tbox_hotkey",
-    "fast_screenshot": "fast_screenshot_hotkey",
-    "run_window_broadcast": "run_window_broadcast_hotkey",
-    "kill_screen_render": "kill_screen_render_hotkey",
-    "run_fullscreen_broadcast": "run_fullscreen_broadcast_hotkey",
-    "guaqi": "guaqi_enabled",
-    "protect_killer": "protect_killer_enabled",
-}
-
-fontpath = get_windows_default_font()
+from src.utils.display import resource_path
 
 
 class Ui:
@@ -54,24 +33,30 @@ class Ui:
         self.bgtmd = 0.6
         self.defult_yy = True
         self.random_yy_enabled = False
-        self.follow_system_accent = True  # 默认跟随系统主题色
-        self.accent_color = get_windows_accent_color()
-        self.theme_mode_key = "system"
-        self.font_loadtime = 1
-        self.NowSelIndex = "0"
-        self.yiyanshowtext = ft.Text("", size=16)
-        self.yiyanshowtext2 = ft.Text("", size=16)
+        self.NowSelIndex = 0
         self.loaded_bg = False
+        self.bgpath = ""
+        self.yiyanfpath = ""
+        self.zdy_fontpath = ""
+        self.font_loadtime = 1
+        self._toast_enabled = False  # 是否启用 Windows Toast 通知
+
+        # tkinter 根窗口（延迟创建）
+        self.root = None
+        self.notebook = None
+        self.status_var = None
+        self._pages = []
 
     # ============================================================
     #  页面无关的通用回调
     # ============================================================
 
     def direct_run_fullscreen_broadcast_cmd(self):
-        if getattr(self, 'KillSCR_swc', None) is None:
+        if self._swc('KillSCR_swc') is None:
             self.show_snakemessage("请先打开广播管理页再使用此功能")
             return
         if self.KillSCR_swc.value:
+            from src.modules.broadcast_handler import force_screenrender_fullscreen
             if force_screenrender_fullscreen():
                 self.show_snakemessage("已恢复全屏模式")
             else:
@@ -80,224 +65,351 @@ class Ui:
             self.show_snakemessage("警告！ 未开启快捷键杀广播进程\n尝试运行的操作已拦截....")
 
     def direct_kill_screen_render(self, *e):
-        run_sigle_cmd("taskkill /f /t /im ScreenRender_Y.exe")
-        run_sigle_cmd("taskkill /f /t /im ScreenRender.exe")
-
-    def theme_changed(self, *e):
-        self.page.theme_mode = (
-            ft.ThemeMode.DARK if self.page.theme_mode == ft.ThemeMode.LIGHT
-            else ft.ThemeMode.LIGHT
-        )
-        self.ztqhb.label = (
-            "亮色主题" if self.page.theme_mode == ft.ThemeMode.LIGHT else "暗色主题"
-        )
-        self.page.update()
-
-    def update_theme(self, font_family=None):
-        if font_family is None:
-            font_family = getattr(self.page.theme, "font_family", "ht")
-        self.page.theme = ft.Theme(
-            font_family=font_family,
-            color_scheme_seed=self.accent_color,
-        )
+        from src.utils.process import kill_process
+        kill_process("ScreenRender_Y.exe")
+        kill_process("ScreenRender.exe")
 
     def hide_toolkit_helper(self):
-        self.page.window.visible = not self.page.window.visible
-        self.page.update()
+        if self.root:
+            if self.root.winfo_viewable():
+                self.root.withdraw()
+            else:
+                self.root.deiconify()
 
-    def _on_hide_tbox_changed(self):
-        self.hotkeyManager.switch_by_name(
-            "hide_tbox", self.hide_tbox_swc.value,
-            self.hide_toolkit_helper,
-        )
+    def _swc(self, name: str):
+        """获取页面挂载到 ui 上的开关控件，不存在返回 None"""
+        return getattr(self, name, None)
 
-    def _on_fast_screenshot_changed(self):
-        self.hotkeyManager.switch_by_name(
-            "fast_screenshot", self.FastGetSC.value,
-            self._scshot_callback,
-        )
+    def _on_hotkey_switch(self, hotkey_name: str, swc_name: str, callback):
+        """通用快捷键开关回调"""
+        swc = self._swc(swc_name)
+        if swc is None:
+            return
+        self.hotkeyManager.switch_by_name(hotkey_name, swc.value, callback)
 
-    def _on_run_window_broadcast_changed(self):
-        self.hotkeyManager.switch_by_name(
-            "run_window_broadcast", self.runwindows_swc.value,
-            self._pages[3].run_win_gbcmd_loj,
-        )
+    def _on_hide_tbox_changed(self, e=None):
+        self._on_hotkey_switch("hide_tbox", "hide_tbox_swc", self.hide_toolkit_helper)
 
-    def _on_kill_screen_render_changed(self):
-        self.hotkeyManager.switch_by_name(
-            "kill_screen_render", self.KillSCR_swc.value,
-            self.direct_kill_screen_render,
-        )
+    def _on_fast_screenshot_changed(self, e=None):
+        self._on_hotkey_switch("fast_screenshot", "FastGetSC", self._scshot_callback)
 
-    def _on_run_fullscreen_broadcast_changed(self):
-        self.hotkeyManager.switch_by_name(
-            "run_fullscreen_broadcast", self.RunFullSC_swc.value,
-            self.direct_run_fullscreen_broadcast_cmd,
-        )
+    def _on_run_window_broadcast_changed(self, e=None):
+        page = self._get_broadcast_page()
+        self._on_hotkey_switch("run_window_broadcast", "runwindows_swc",
+                               page.run_win_gbcmd_loj if page else None)
+
+    def _on_kill_screen_render_changed(self, e=None):
+        self._on_hotkey_switch("kill_screen_render", "KillSCR_swc", self.direct_kill_screen_render)
+
+    def _on_run_fullscreen_broadcast_changed(self, e=None):
+        self._on_hotkey_switch("run_fullscreen_broadcast", "RunFullSC_swc",
+                               self.direct_run_fullscreen_broadcast_cmd)
+
+    def _on_topmost_changed(self, e=None):
+        if self.root:
+            self.root.attributes("-topmost", bool(self._swc("topmost_swc").value if self._swc("topmost_swc") else False))
 
     # ============================================================
     #  主入口
     # ============================================================
 
-    def main(self, bruh: ft.Page):
-        self.page = bruh
-        self.page.title = self.release_name
-        self.page.fonts = {"ht": fontpath}
-        self.page.theme = ft.Theme(
-            font_family="ht",
-            color_scheme_seed=self.accent_color,
-        )
-        self.page.theme_mode = ft.ThemeMode.SYSTEM if hasattr(ft.ThemeMode, "SYSTEM") else ft.ThemeMode.LIGHT
-        self.page.window.width = 480
-        self.page.window.height = 700
-        # 自定义窗口/任务栏图标（覆盖 flet 桌面客户端的默认图标）
+    def main(self):
+        self.root = tk.Tk()
+        self.root.title(self.release_name)
+        self.root.geometry("520x750")
+        self.root.minsize(420, 600)
+        # 全局关闭控件点击后的虚线焦点框
+        self.root.option_add("*Button.highlightThickness", 0)
+        self.root.option_add("*Checkbutton.highlightThickness", 0)
+
+        # 窗口图标
         try:
-            self.page.window.icon = resource_path("logo.png")
+            icon_path = resource_path("logo.png")
+            if os.path.exists(icon_path):
+                # tkinter 在 Windows 上支持 .ico，不支持 .png
+                pass
         except Exception:
             pass
-        # 中文本地化：让输入框右键菜单（复制/粘贴/全选等）显示为中文
+
+        # 尝试设置图标（使用 logo.ico 如果存在）
         try:
-            self.page.locale_configuration = ft.LocaleConfiguration(
-                supported_locales=[ft.Locale("zh", "CN")],
-                current_locale=ft.Locale("zh", "CN"),
-            )
+            ico_path = resource_path("logo.ico")
+            if os.path.exists(ico_path):
+                self.root.iconbitmap(ico_path)
         except Exception:
             pass
-        self.page.update()
 
-        # ---- 共享组件 ----
+        # 绑定关闭事件
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        self.pick_files_dialog = ft.FilePicker(on_result=self.pick_files_result)
-        self.yiyan_pick_files_dialog = ft.FilePicker(on_result=self.yiyan_pick_files_result)
-        self.font_pick_files_dialog = ft.FilePicker(on_result=self.font_pick_files_result)
-        self.list_all_pickdialog = [self.pick_files_dialog, self.yiyan_pick_files_dialog, self.font_pick_files_dialog]
+        # ---- 状态栏 ----
+        status_frame = ttk.Frame(self.root)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        self.status_var = tk.StringVar(value="")
+        self.status_label = ttk.Label(status_frame, textvariable=self.status_var,
+                                      relief=tk.SUNKEN, anchor=tk.W,
+                                      wraplength=500, justify=tk.LEFT)
+        self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2, pady=1)
 
-        self.hide_tbox_swc = PersistentSwitch(
-            config_key=_SETTING_KEYS["hide_tbox"],
-            label=get_hotkey_label("hide_tbox") + " 隐&显工具箱",
-            default_value=True,
-            verifier=lambda: self.hotkeyManager.is_registered_by_name("hide_tbox", self.hide_toolkit_helper),
-            on_toggle=lambda _: self._on_hide_tbox_changed(),
-        )
+        # ---- 一言显示 ----
+        self.yiyan_var = tk.StringVar(value=DEFAULT_SHOW_YIYAN)
+        yiyan_frame = ttk.Frame(self.root)
+        yiyan_frame.pack(fill=tk.X, padx=5, pady=(5, 0))
+        self.yiyan_label = ttk.Label(yiyan_frame, textvariable=self.yiyan_var, font=("", 10), foreground="gray")
+        self.yiyan_label.pack(anchor=tk.W)
 
-        _screenshot_cb = lambda: self._run_in_thread(get_scshot, "截图")
-        self._scshot_callback = _screenshot_cb
+        # ---- 标签页导航 ----
+        style = ttk.Style()
+        style.configure("TNotebook.Tab", padding=[8, 2])
+        # 去掉按钮/复选框点击后的虚线焦点框
+        style.configure("TButton", focuscolor="none")
+        style.configure("TCheckbutton", focuscolor="none")
+        # 去掉顶栏标签点击后的虚线焦点框（移除 Notebook.focus 元素）
+        style.layout("TNotebook.Tab", [
+            ("Notebook.tab", {"sticky": "nswe", "children": [
+                ("Notebook.padding", {"side": "top", "sticky": "nswe", "children": [
+                    ("Notebook.label", {"side": "top", "sticky": ""}),
+                ]}),
+            ]}),
+        ])
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        self.FastGetSC = PersistentSwitch(
-            config_key=_SETTING_KEYS["fast_screenshot"],
-            label=get_hotkey_label("fast_screenshot") + " 屏幕截图",
-            verifier=lambda: self.hotkeyManager.is_registered_by_name("fast_screenshot", _screenshot_cb),
-            on_toggle=lambda _: self._on_fast_screenshot_changed(),
-        )
-
-        # ---- 页面实例 ----
-
+        # ---- 构建页面 ----
         self._pages = [
+            PageOverview(self),
             PageProcess(self),
-            PageOther(self),
+            PageService(self),
             PageUnlock(self),
             PageBroadcast(self),
-            PageCommands(self),
             PageDll(self),
             PageBackup(self),
             PageSettings(self),
             PageAbout(self),
-            PageCrash(self),
+            PageAdvanced(self),
         ]
 
-        # ---- 导航栏 ----
+        tab_labels = [
+            "概览", "进程", "服务", "解锁", "广播",
+            "DLL", "文件", "设置", "关于", "高级",
+        ]
 
-        self.MyRail = ft.NavigationRail(
-            selected_index=0, label_type="ALL", min_width=30, min_extended_width=30,
-            group_alignment=-0.8, expand=False,
-            destinations=[
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.AUTO_FIX_HIGH_OUTLINED), selected_icon=ft.Icon(ft.Icons.AUTO_FIX_HIGH), label="进程管理"),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.INTEGRATION_INSTRUCTIONS_OUTLINED), selected_icon=ft.Icon(ft.Icons.INTEGRATION_INSTRUCTIONS), label_content=ft.Text("其他管理")),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.LOCK_OPEN_OUTLINED), selected_icon=ft.Icon(ft.Icons.LOCK_OPEN_SHARP), label="解锁管理"),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.SCREEN_SHARE_OUTLINED), selected_icon=ft.Icon(ft.Icons.SCREEN_SHARE_SHARP), label_content=ft.Text("广播管理")),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.VPN_KEY_OUTLINED), selected_icon=ft.Icon(ft.Icons.VPN_KEY), label="广播命令"),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.KEYBOARD_OPTION_KEY_OUTLINED), selected_icon=ft.Icon(ft.Icons.KEYBOARD_OPTION_KEY), label="DLL工具"),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.BACKUP_OUTLINED), selected_icon=ft.Icon(ft.Icons.BACKUP), label="备份恢复"),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.SETTINGS_OUTLINED), selected_icon=ft.Icon(ft.Icons.SETTINGS), label_content=ft.Text("设置")),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.INFO_OUTLINE), selected_icon=ft.Icon(ft.Icons.INFO), label="关于"),
-                ft.NavigationRailDestination(icon=ft.Icon(ft.Icons.WIFI_TETHERING_OUTLINED), selected_icon=ft.Icon(ft.Icons.WIFI_TETHERING), label="远程崩溃"),
-            ],
-            on_change=lambda e: self.selPages_Helper(e.control.selected_index),
-        )
+        for i, page_cls in enumerate(self._pages):
+            page_frame = page_cls.build()
+            self.notebook.add(page_frame, text=tab_labels[i])
 
-        # ---- 启动 ----
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+
+        # ---- 全局去掉控件的焦点虚线框（按钮/复选框等非输入控件不再抢占焦点）----
+        self._disable_widget_focus(self.root)
+
+        # ---- 为输入框统一绑定右键菜单（剪切/复制/粘贴/全选）----
+        self._setup_input_context_menu()
+
+        # ---- 启动初始化 ----
         self.pick_a_random_yiyan()
-        self.selPages_Helper(0)
-        self.added_pickdialog()
-        self.try_get_history_path()
         self.try_restore_settings()
-        self.reflashStudentPath()
+        self.reflashStudentPath(silent=True)
         pass_ui_class(self)
 
-    # ============================================================
-    #  页面切换
-    # ============================================================
+        self.root.mainloop()
 
-    def selPages_Helper(self, index):
-        self.NowSelIndex = str(index)
-        self.pick_a_random_yiyan()
-        page = self._pages[index]
-        self.apply_bg_to_ui(page.build())
-        if index == 7:
-            self.added_pickdialog()
+    def _disable_widget_focus(self, widget):
+        """递归关闭所有非输入控件的焦点（去掉点击后的虚线焦点框）"""
+        try:
+            if widget.winfo_class() in ("TButton", "TCheckbutton", "TRadiobutton",
+                                        "Button", "Checkbutton", "Radiobutton",
+                                        "TSpinbox", "Combobox", "TCombobox",
+                                        "TNotebook"):
+                try:
+                    widget.configure(takefocus=0)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            for child in widget.winfo_children():
+                self._disable_widget_focus(child)
+        except Exception:
+            pass
 
-    def apply_bg_to_ui(self, needLoad_Stuff_list):
-        # 直接复用页面 Column，设 scroll + expand，不嵌套
-        # Row expand 填满窗口 → Column expand 填满 Row 高度 →
-        # 内容超出行高时 scroll=AUTO 自动出现滚动条 + 鼠标滚轮
-        if isinstance(needLoad_Stuff_list, ft.Column):
-            needLoad_Stuff_list.scroll = ft.ScrollMode.AUTO
-            needLoad_Stuff_list.expand = True
-            needLoad_Stuff_list.alignment = ft.MainAxisAlignment.START
-            needLoad_Stuff_list.horizontal_alignment = ft.CrossAxisAlignment.START
+    def _setup_input_context_menu(self):
+        """为所有输入框（Entry/Text/Spinbox）统一绑定 Windows 原生右键菜单。
 
-        if self.loaded_bg:
-            bgb = ft.Stack(controls=[self.col_imgbg, needLoad_Stuff_list], expand=True)
-            nedadd = ft.Row(
-                [self.MyRail, ft.VerticalDivider(width=0), bgb],
-                expand=True,
-                vertical_alignment=ft.CrossAxisAlignment.START,
-            )
-        else:
-            nedadd = ft.Row(
-                [self.MyRail, ft.VerticalDivider(width=0), needLoad_Stuff_list],
-                expand=True,
-                vertical_alignment=ft.CrossAxisAlignment.START,
-            )
-        self.page.controls = [nedadd]
-        for idlg in self.list_all_pickdialog:
-            if idlg not in self.page.controls:
-                self.page.controls.append(idlg)
-        self.page.update()
+        通过 bind_class 全局绑定，覆盖当前及后续创建的所有输入控件。
+        菜单由系统绘制（原生 Windows 主题风格）。
+        """
+        try:
+            from src.gui.widgets import show_native_context_menu
+
+            def _popup(event):
+                self._ctx_widget = event.widget
+                # 临时把光标改为箭头，避免菜单上显示输入光标(I-beam)
+                prev_root = prev_widget = None
+                try:
+                    prev_root = self.root.cget("cursor")
+                    self.root.configure(cursor="arrow")
+                except Exception:
+                    pass
+                try:
+                    prev_widget = event.widget.cget("cursor")
+                    event.widget.configure(cursor="arrow")
+                except Exception:
+                    pass
+                try:
+                    hwnd = self.root.winfo_id()
+                except Exception:
+                    hwnd = 0
+                try:
+                    show_native_context_menu(hwnd, event.x_root, event.y_root, [
+                        ("剪切", self._ctx_cut),
+                        ("复制", self._ctx_copy),
+                        ("粘贴", self._ctx_paste),
+                        None,
+                        ("全选", self._ctx_select_all),
+                    ])
+                finally:
+                    try:
+                        self.root.configure(cursor=prev_root or "")
+                    except Exception:
+                        pass
+                    try:
+                        event.widget.configure(cursor=prev_widget or "")
+                    except Exception:
+                        pass
+
+            # ttk 与 tk 输入控件的 class 名
+            for cls in ("TEntry", "Entry", "Text", "TSpinbox", "Spinbox"):
+                try:
+                    self.root.bind_class(cls, "<Button-3>", _popup)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _ctx_target(self):
+        """返回右键菜单的目标控件（若已销毁则返回 None）"""
+        w = getattr(self, "_ctx_widget", None)
+        if w is not None:
+            try:
+                w.winfo_exists()
+                return w
+            except Exception:
+                return None
+        return None
+
+    def _ctx_cut(self):
+        w = self._ctx_target()
+        if w:
+            try:
+                w.event_generate("<<Cut>>")
+            except Exception:
+                pass
+
+    def _ctx_copy(self):
+        w = self._ctx_target()
+        if w:
+            try:
+                w.event_generate("<<Copy>>")
+            except Exception:
+                pass
+
+    def _ctx_paste(self):
+        w = self._ctx_target()
+        if w:
+            try:
+                w.event_generate("<<Paste>>")
+            except Exception:
+                pass
+
+    def _ctx_select_all(self):
+        w = self._ctx_target()
+        if w:
+            try:
+                w.event_generate("<<SelectAll>>")
+            except Exception:
+                pass
+
+    def _on_close(self):
+        """窗口关闭时的清理"""
+        try:
+            # 取消各页面的定时器（如概览页 3 秒自动刷新），避免残留回调
+            for page in self._pages:
+                after_id = getattr(page, "_after_id", None)
+                if after_id:
+                    try:
+                        self.root.after_cancel(after_id)
+                    except Exception:
+                        pass
+            self.root.destroy()
+        except Exception:
+            pass
+
+    def _on_tab_changed(self, event=None):
+        if self.notebook:
+            self.NowSelIndex = self.notebook.index(self.notebook.select())
+            self.pick_a_random_yiyan()
+            # 切换到概览页时立即刷新其状态
+            if self.NowSelIndex == 0 and self._pages:
+                overview = self._pages[0]
+                if hasattr(overview, "_refresh"):
+                    try:
+                        overview._refresh()
+                    except Exception:
+                        pass
 
     # ============================================================
     #  学生端相关
     # ============================================================
 
-    def reflashStudentPath(self, *e):
+    def reflashStudentPath(self, *e, silent: bool = False):
+        """重新检测学生端路径/进程名/版本。
+
+        silent=True 时不弹窗、不写状态栏，仅更新内部状态，
+        结果由概览页（工具箱状态）展示。
+        """
+        from src.modules.student_detector import detect_student_version
         _ = detect_student_version()
         if toolkit_cfg.oseasypath_have_been_modified:
-            guess_msg = f"猜测的学生端版本 v{_ / 10}" if _ != 0 else '检测学生端版本特征失败'
-            self.show_snakemessage(f"更新学生端路径成功\n{toolkit_cfg.oseasy_path}\n学生端进程名:{toolkit_cfg.student_exe_name}\n{guess_msg}")
+            ver = toolkit_cfg.student_version
+            ver_str = toolkit_cfg.student_version_str
+            if ver_str:
+                guess_msg = f"学生端版本:V{ver_str}"
+            elif ver != 0:
+                guess_msg = f"猜测的学生端版本 v{ver / 10}"
+            else:
+                guess_msg = '检测学生端版本特征失败'
+            if not silent:
+                self.show_snakemessage(f"更新学生端路径成功\n{toolkit_cfg.oseasy_path}\n学生端进程名:{toolkit_cfg.student_exe_name}\n{guess_msg}")
+            # 通知概览页刷新学生端信息
+            self._refresh_overview_student_info()
         else:
-            self.show_snakemessage("更新路径失败\n也许是学生端未运行??")
+            if not silent:
+                self.show_snakemessage("更新路径失败\n也许是学生端未运行??")
 
-    def _on_guaqi_changed(self, *e):
-        """挂起学生端开关变更"""
+    def _refresh_overview_student_info(self):
+        """刷新概览页“工具箱状态”中的学生端信息（若概览页已构建）"""
+        overview = self._pages[0] if self._pages else None
+        if overview is not None and hasattr(overview, "update_student_info"):
+            overview.update_student_info()
+
+    def _on_guaqi_changed(self, e=None):
         self.guaqi_chufa()
 
-    def _on_protect_killer_changed(self, *e):
-        """外部cmd守护进程开关变更"""
+    def _on_protect_killer_changed(self, e=None):
         from src.modules.killer import killer_script_protect
+        from src.utils.process import is_process_running
+        if e.value:
+            if not is_process_running(toolkit_cfg.student_exe_name):
+                self.show_snakemessage(f"学生端进程 {toolkit_cfg.student_exe_name} 不存在，无法启动循环杀死")
+                if self._swc('protect_swc'):
+                    self._swc('protect_swc').value = False
+                # 已写入 config 的 True 需要回退
+                toolkit_cfg.set_config_key_data("protect_killer_enabled", False)
+                return
         killer_script_protect()
 
-    def _on_sethc_toggle(self, *e):
-        """粘滞键劫持开关"""
+    def _on_sethc_toggle(self, e=None):
         from src.modules.killer import register_killer_script, del_register_killer
         if self.sethc_swc.value:
             register_killer_script()
@@ -305,89 +417,69 @@ class Ui:
             del_register_killer()
 
     def guaqi_chufa(self, *e):
+        from src.utils.process import suspend_process, resume_process, is_process_running
         if not self.guaqi_runstatus:
-            self.page.window.visible = False
-            self.page.update()
-            status = utils.guaqi_process(toolkit_cfg.student_exe_name)
-            utils.guaqi_process("MultiClient.exe")
+            # 挂起前检查进程是否存在，避免 withdraw/deiconify 导致的窗口闪烁
+            if not is_process_running(toolkit_cfg.student_exe_name):
+                self.show_snakemessage(f"学生端进程 {toolkit_cfg.student_exe_name} 不存在，挂起失败")
+                self.guaqi_runstatus = False
+                toolkit_cfg.set_config_key_data("guaqi_enabled", False)
+                if self._swc('guaqi_sw'):
+                    self._swc('guaqi_sw').value = False
+                return
+            self.root.withdraw()
+            status = suspend_process(toolkit_cfg.student_exe_name)
+            suspend_process("MultiClient.exe")
             if status is True:
                 self.guaqi_runstatus = True
                 time.sleep(0.8)
-                self.page.window.visible = True
-                self.page.update()
+                self.root.deiconify()
             else:
-                self.page.window.visible = True
+                self.root.deiconify()
                 self.guaqi_runstatus = False
-                toolkit_cfg.set_config_key_data(_SETTING_KEYS["guaqi"], False)
-                self.guaqi_sw.value = False
-                self.page.update()
+                toolkit_cfg.set_config_key_data("guaqi_enabled", False)
+                if self._swc('guaqi_sw'):
+                    self._swc('guaqi_sw').value = False
                 self.show_snakemessage(status)
         else:
-            status = utils.huifu_process(toolkit_cfg.student_exe_name)
-            utils.huifu_process("MultiClient.exe")
+            status = resume_process(toolkit_cfg.student_exe_name)
+            resume_process("MultiClient.exe")
             if status is True:
                 self.guaqi_runstatus = False
-                toolkit_cfg.set_config_key_data(_SETTING_KEYS["guaqi"], False)
+                toolkit_cfg.set_config_key_data("guaqi_enabled", False)
             else:
                 self.guaqi_runstatus = True
-                toolkit_cfg.set_config_key_data(_SETTING_KEYS["guaqi"], True)
-                self.guaqi_sw.value = True
-                self.page.update()
+                toolkit_cfg.set_config_key_data("guaqi_enabled", True)
+                if self._swc('guaqi_sw'):
+                    self._swc('guaqi_sw').value = True
                 self.show_snakemessage(status)
 
     # ============================================================
     #  外观 / 一言
     # ============================================================
 
-    def try_get_history_path(self):
-        fstst = toolkit_cfg.first_launch_check()
-        if not fstst:
-            bgPath = toolkit_cfg.get_style_path("bgPath")
-            if bgPath:
-                self.bgpath = bgPath
-                self.loaded_bg = True
-                self.reflash_ui_bg()
-            yiyanPath = toolkit_cfg.get_style_path("yiyanPath")
-            if yiyanPath:
-                self.yiyanfpath = yiyanPath
-                self.from_file_load_yiyan()
-            fontPath = toolkit_cfg.get_style_path("fontPath")
-            if fontPath:
-                self.zdy_fontpath = fontPath
-                self.setup_zidingyi_font()
+    def toggle_random_yiyan(self, e=None):
+        if e is not None:
+            self.random_yy_enabled = e.value
+        self.pick_a_random_yiyan()
 
     def try_restore_settings(self):
         """从配置文件恢复用户设置状态"""
-        from src.utils.system.logger import debug, exception as _log_exc
+        from src.utils.logger import debug, exception as _log_exc
         try:
             self._try_restore_settings_impl()
         except Exception:
             _log_exc("恢复设置时出现异常")
-            # 不重新抛出，让 UI 至少能启动
 
     def _try_restore_settings_impl(self):
-        # 主题模式
-        saved_theme = toolkit_cfg.get_config_key_data(_SETTING_KEYS["theme_mode"])
-        if saved_theme in ("system", "light", "dark"):
-            self.theme_mode_key = saved_theme
-            self.set_theme_mode()
-
-        # 系统主题色跟随
-        saved_accent = toolkit_cfg.get_config_key_data(_SETTING_KEYS["follow_system_accent"])
-        if saved_accent is not None:
-            self.follow_system_accent = bool(saved_accent)
-            if not self.follow_system_accent:
-                self.accent_color = DEFAULT_ACCENT_COLOR
-            self.update_theme()
-
         # 随机一言
-        saved_yy = toolkit_cfg.get_config_key_data(_SETTING_KEYS["random_yiyan"])
+        saved_yy = toolkit_cfg.get_config_key_data("random_yiyan_enabled")
         if saved_yy is not None:
             self.random_yy_enabled = bool(saved_yy)
             self.pick_a_random_yiyan()
 
         # 背景不透明度
-        saved_opacity = toolkit_cfg.get_config_key_data(_SETTING_KEYS["bg_opacity"])
+        saved_opacity = toolkit_cfg.get_config_key_data("bg_opacity")
         if saved_opacity is not None:
             try:
                 self.bgtmd = float(saved_opacity)
@@ -395,81 +487,77 @@ class Ui:
                 pass
 
         # 挂起学生端状态
-        saved_guaqi = toolkit_cfg.get_config_key_data(_SETTING_KEYS["guaqi"])
+        saved_guaqi = toolkit_cfg.get_config_key_data("guaqi_enabled")
         if saved_guaqi is not None:
             self.guaqi_runstatus = bool(saved_guaqi)
+            # 启动时若已挂起但进程不存在，重置状态
+            if self.guaqi_runstatus:
+                from src.utils.process import is_process_running
+                if not is_process_running(toolkit_cfg.student_exe_name):
+                    self.guaqi_runstatus = False
+                    toolkit_cfg.set_config_key_data("guaqi_enabled", False)
 
-        # 初始注册快捷键（根据恢复后的状态）
+        # 置顶窗口
+        saved_topmost = toolkit_cfg.get_config_key_data("topmost_enabled")
+        if saved_topmost is not None and self.root:
+            self.root.attributes("-topmost", bool(saved_topmost))
+
+        # 恢复背景路径
+        bgPath = toolkit_cfg.get_style_path("bgPath")
+        if bgPath:
+            self.bgpath = bgPath
+            self.loaded_bg = True
+
+        # 恢复一言路径
+        yiyanPath = toolkit_cfg.get_style_path("yiyanPath")
+        if yiyanPath:
+            self.yiyanfpath = yiyanPath
+            self.from_file_load_yiyan()
+
+        # 初始注册快捷键
         self.hotkeyManager.switch_by_name("hide_tbox", self.hide_tbox_swc.value, self.hide_toolkit_helper)
         self.hotkeyManager.switch_by_name("fast_screenshot", self.FastGetSC.value, self._scshot_callback)
 
-        # 广播页的快捷键在 page_broadcast.build() 中恢复（此时控件尚未创建）
+        # 启动时若循环杀死开关为 ON 但进程不存在，自动关掉
+        from src.utils.process import is_process_running
+        if (self._swc('protect_swc') and self._swc('protect_swc').value
+                and not is_process_running(toolkit_cfg.student_exe_name)):
+            self._swc('protect_swc').value = False
+            toolkit_cfg.set_config_key_data("protect_killer_enabled", False)
+
+        # 恢复 Toast 通知设置
+        saved_toast = toolkit_cfg.get_config_key_data("toast_notification_enabled")
+        if saved_toast is not None:
+            self._toast_enabled = bool(saved_toast)
 
     def _restore_broadcast_hotkeys(self):
-        """广播页快捷键初始注册（首次 build 时调用一次）"""
+        """广播页快捷键初始注册"""
         if getattr(self, '_broadcast_hotkeys_restored', False):
             return
         self._broadcast_hotkeys_restored = True
-        self.hotkeyManager.switch_by_name("run_window_broadcast", self.runwindows_swc.value, self._pages[3].run_win_gbcmd_loj)
+        self.hotkeyManager.switch_by_name("run_window_broadcast", self.runwindows_swc.value, self._get_broadcast_page().run_win_gbcmd_loj)
         self.hotkeyManager.switch_by_name("kill_screen_render", self.KillSCR_swc.value, self.direct_kill_screen_render)
         self.hotkeyManager.switch_by_name("run_fullscreen_broadcast", self.RunFullSC_swc.value, self.direct_run_fullscreen_broadcast_cmd)
 
-    def reflash_ui_bg(self):
-        toolkit_cfg.set_style_path("bgPath", self.bgpath)
-        self.loaded_bg = True
-        self.col_imgbg = ft.Image(
-            src=self.bgpath, opacity=self.bgtmd,
-            fit=ft.ImageFit.COVER, expand=True,
-        )
-        self.selPages_Helper(int(self.NowSelIndex))
-
-    def change_bg_btmd(self, e):
-        self.bgtmd = e.control.value
-        toolkit_cfg.set_config_key_data(_SETTING_KEYS["bg_opacity"], self.bgtmd)
-        self.reflash_ui_bg()
-
-    def toggle_system_accent(self, e=None):
-        """开关系统主题色跟随"""
-        if e:
-            self.follow_system_accent = e.control.value
-        if self.follow_system_accent:
-            self.accent_color = get_windows_accent_color()
-        else:
-            self.accent_color = DEFAULT_ACCENT_COLOR
-        self.update_theme()
-        self.page.update()
-
-    def toggle_random_yiyan(self, e=None):
-        if e:
-            self.random_yy_enabled = e.control.value
-        self.pick_a_random_yiyan()
-
-    def set_theme_mode(self, e=None):
-        if e:
-            self.theme_mode_key = e.control.value
-        toolkit_cfg.set_config_key_data(_SETTING_KEYS["theme_mode"], self.theme_mode_key)
-        if self.theme_mode_key == "system":
-            self.page.theme_mode = ft.ThemeMode.SYSTEM
-        elif self.theme_mode_key == "light":
-            self.page.theme_mode = ft.ThemeMode.LIGHT
-        else:
-            self.page.theme_mode = ft.ThemeMode.DARK
-        self.page.update()
+    def _get_broadcast_page(self):
+        """按类型查找广播页实例（不依赖固定索引，避免页面增删导致偏移）"""
+        from src.gui.pages.page_broadcast import PageBroadcast
+        for page in self._pages:
+            if isinstance(page, PageBroadcast):
+                return page
+        return None
 
     def pick_a_random_yiyan(self, *e):
         if self.random_yy_enabled:
             if hasattr(self, "yiyanlist") and self.yiyanlist:
                 pickindex = random.randint(0, len(self.yiyanlist) - 1)
-                self.yiyanshowtext.value = self.yiyanlist[pickindex]
-                self.yiyanshowtext2.value = self.yiyanlist[pickindex]
+                text = self.yiyanlist[pickindex]
             else:
                 pickindex = random.randint(0, len(DEFAULT_YIYAN_LIST) - 1)
-                self.yiyanshowtext.value = DEFAULT_YIYAN_LIST[pickindex]
-                self.yiyanshowtext2.value = DEFAULT_YIYAN_LIST[pickindex]
+                text = DEFAULT_YIYAN_LIST[pickindex]
         else:
-            self.yiyanshowtext.value = DEFAULT_SHOW_YIYAN
-            self.yiyanshowtext2.value = DEFAULT_SHOW_YIYAN
-        self.page.update()
+            text = DEFAULT_SHOW_YIYAN
+        self.yiyan_var.set(text)
 
     def from_file_load_yiyan(self):
         toolkit_cfg.set_style_path("yiyanPath", self.yiyanfpath)
@@ -483,51 +571,18 @@ class Ui:
         except Exception as e:
             self.show_snakemessage(f"加载外部一言时出现{e}异常")
 
-    def setup_zidingyi_font(self):
-        toolkit_cfg.set_style_path("fontPath", self.zdy_fontpath)
-        self.page.fonts["zidingyi"] = self.zdy_fontpath
-        self.update_theme(font_family="zidingyi")
-        self.page.update()
-        if self.loaded_bg:
-            self.reflash_ui_bg()
-
     # ============================================================
-    #  FilePicker 回调
+    #  通用工具（委托到 widgets.py）
     # ============================================================
 
-    def pick_files_result(self, e):
-        try:
-            self.bgpath = os.path.join(e.files[0].path)
-            self.reflash_ui_bg()
-        except (TypeError, IndexError):
-            self.show_snakemessage("未选择背景图片")
-
-    def yiyan_pick_files_result(self, e):
-        try:
-            self.yiyanfpath = os.path.join(e.files[0].path)
-            self.from_file_load_yiyan()
-        except (TypeError, IndexError):
-            self.show_snakemessage("未选择一言文件")
-
-    def font_pick_files_result(self, e):
-        try:
-            self.zdy_fontpath = os.path.join(e.files[0].path)
-            self.setup_zidingyi_font()
-        except (TypeError, IndexError):
-            self.show_snakemessage("未选择字体文件")
-
-    # ============================================================
-    #  通用工具
-    # ============================================================
-
-    def show_snakemessage(self, showtext: str):
-        self.page.open(ft.SnackBar(ft.Text(showtext)))
-        self.page.update()
+    make_scrollable = staticmethod(make_scrollable)
+    make_output_text = staticmethod(make_output_text)
+    append_text = staticmethod(append_text)
+    clear_text = staticmethod(clear_text)
 
     def _run_in_thread(self, func, label: str = "操作"):
-        """在后台线程执行函数，避免阻塞 UI 或 pynput 回调线程"""
-        import threading
-        from src.utils.system.logger import debug, exception
+        """在后台线程执行函数，避免阻塞 UI"""
+        from src.utils.logger import debug, exception
         def _wrapper():
             debug(f"[线程] {label} 开始")
             try:
@@ -537,10 +592,45 @@ class Ui:
             debug(f"[线程] {label} 结束")
         threading.Thread(target=_wrapper, daemon=True).start()
 
-    def added_pickdialog(self):
-        for idlg in self.list_all_pickdialog:
-            self.page.add(idlg)
-            self.page.update()
+    def show_snakemessage(self, showtext: str):
+        """显示消息到状态栏（3 秒后自动消失）；若 toast 开关打开，同步发 Windows 通知"""
+        if self.status_var:
+            self.status_var.set(showtext)
+        if self.root:
+            self.root.after(3000, lambda: self.status_var.set("") if self.status_var else None)
+        if self._toast_enabled:
+            self.show_toast("OsEasy-ToolKit", showtext)
+
+    def show_toast(self, title: str, msg: str):
+        """发送标准 Windows Toast 通知（ToastGeneric 模板，第一行小图标+标题、第二行内容）"""
+        if not self._toast_enabled:
+            return
+        from src.utils.toast import send_toast
+        send_toast(title=title, msg=msg)
+
+    def bind_tooltip(self, widget, tooltip_id: str, **fmt_kwargs):
+        """为控件绑定悬停提示：鼠标移入时在状态栏显示说明，移出时清空"""
+        from config import TOOLTIPS
+        from src.core.settings import toolkit_cfg
+        description = TOOLTIPS.get(tooltip_id, tooltip_id)
+        # 自动注入路径占位符（若文案中引用了它们）
+        data_dir = os.path.dirname(toolkit_cfg.config_file_path)
+        if "{data_dir}" in description:
+            fmt_kwargs.setdefault("data_dir", data_dir)
+        if "{student_dir}" in description:
+            fmt_kwargs.setdefault("student_dir", toolkit_cfg.oseasy_path)
+        if "{backup_dir}" in description:
+            fmt_kwargs.setdefault("backup_dir", os.path.join(data_dir, "backups"))
+        if fmt_kwargs:
+            description = description.format(**fmt_kwargs)
+        def _enter(_e):
+            if self.status_var:
+                self.status_var.set(description)
+        def _leave(_e):
+            if self.status_var:
+                self.status_var.set("")
+        widget.bind("<Enter>", _enter)
+        widget.bind("<Leave>", _leave)
 
 
 ToolKit = Ui()

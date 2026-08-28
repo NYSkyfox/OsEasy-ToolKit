@@ -1,4 +1,4 @@
-# src/utils/system/aumid.py
+# src/utils/aumid.py
 # 注册 AppUserModelID (AUMID)：在开始菜单创建带 AUMID 的快捷方式
 # 用途：让 Toast 通知的来源正确显示为应用名/图标（纯 ctypes COM，零依赖）
 
@@ -98,7 +98,7 @@ def register_aumid(
     :param icon: 图标路径（.ico）
     :param lnk_path: .lnk 保存路径（默认开始菜单 Programs 下）
     """
-    from src.utils.system.logger import debug
+    from src.utils.logger import debug
 
     if exe is None:
         exe = sys.executable

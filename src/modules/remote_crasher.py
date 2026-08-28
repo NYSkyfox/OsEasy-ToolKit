@@ -13,7 +13,7 @@ import ipaddress
 import socket
 import time
 
-from src.utils.system.logger import info, warn, error, debug
+from src.utils.logger import info, warn, error, debug
 
 # 目标端口（学生端监听的控制通道，实测 ConnectPort=9003 可触发崩溃）
 DEFAULT_PORT = 9003

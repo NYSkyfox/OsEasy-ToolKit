@@ -1,32 +1,5 @@
 # src/core/constants.py
-# 全局常量与状态
+# 向后兼容 re-export（已拆分至 paths.py + state.py）
 
-import os
-from config import BACKUP_PATH_TEMPLATE, CMD_FILE_PATH_TEMPLATE, LOG_DIR_TEMPLATE, SCREENSHOT_PATH_TEMPLATE
-
-_username = os.environ.get('USERNAME') or 'Default'
-
-cmd_file_path = CMD_FILE_PATH_TEMPLATE.format(username=_username)
-backup_path = BACKUP_PATH_TEMPLATE.format(username=_username)
-log_dir_path = LOG_DIR_TEMPLATE.format(username=_username)
-screenshot_path = SCREENSHOT_PATH_TEMPLATE.format(username=_username)
-
-# 创建脚本目录、备份目录、日志目录和截图目录
-try:
-    os.makedirs(cmd_file_path, mode=0o777, exist_ok=True)
-    os.makedirs(backup_path, mode=0o777, exist_ok=True)
-    os.makedirs(log_dir_path, mode=0o777, exist_ok=True)
-    os.makedirs(screenshot_path, mode=0o777, exist_ok=True)
-except PermissionError:
-    raise Exception("权限不足: 请右键使用管理员身份运行")
-except (FileNotFoundError, OSError):
-    # 若父目录不存在导致失败，确保父目录存在后重试
-    for p in (cmd_file_path, backup_path, log_dir_path, screenshot_path):
-        parent = os.path.dirname(p)
-        if parent and not os.path.exists(parent):
-            os.makedirs(parent, mode=0o777, exist_ok=True)
-        os.makedirs(p, mode=0o777, exist_ok=True)
-
-# 运行时状态标志
-is_kit_killer_running = False
-is_protect_killer_script_running = False
+from src.core.paths import cmd_file_path, backup_path, log_dir_path, screenshot_path, ensure_dirs
+from src.core.state import is_kit_killer_running, is_protect_killer_script_running

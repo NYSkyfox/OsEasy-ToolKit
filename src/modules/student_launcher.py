@@ -83,7 +83,7 @@ def find_real_student() -> str | None:
     优先查找 Student_Real.exe（重命名后的副本）。"""
     import config
     from config import DEFAULT_OSEASY_PATH
-    from src.core.runtime_config import toolkit_cfg
+    from src.core.settings import toolkit_cfg
 
     # 尝试读取之前保存的路径
     try:

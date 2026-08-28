@@ -10,7 +10,7 @@ from config import RELEASE_NAME, DATA_ROOT_TEMPLATE
 # ── 日志预初始化（提权前就开始记录日志） ──
 _username = os.environ.get('USERNAME', 'Default')
 _log_dir = DATA_ROOT_TEMPLATE.format(username=_username)
-from src.utils.system.logger import pre_init, error as _log_error, exception as _log_exception
+from src.utils.logger import pre_init, error as _log_error, exception as _log_exception
 pre_init(_log_dir)
 
 # ── 顶层异常捕获：确保任何崩溃（包括 import 阶段的 SyntaxError）都写入日志 ──
@@ -30,7 +30,7 @@ try:
         ERROR_ALREADY_EXISTS = 183
         if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
             # 已有实例在运行，激活已存在的窗口并退出
-            from src.utils.system.logger import info
+            from src.utils.logger import info
             info("检测到已有实例运行，退出")
             try:
                 SW_SHOW = 5
@@ -46,61 +46,34 @@ try:
     check_single_instance()
 
     # ── UAC 提权 ──
-    from src.utils.system.uac_elevator import elevate
+    from src.utils.uac import elevate
     elevate(__file__)
 
     # CI 测试模式：只 import 关键依赖并初始化，不启动 GUI
     if os.environ.get("OSEASY_TEST_MODE") == "1":
-        from src.core.runtime_config import toolkit_cfg
-        from src.core.helpers import use_bat_file_to_run_cmd
-        import flet as ft
+        from src.core.settings import toolkit_cfg
         from src.gui.app import ToolKit
         print("OSEASY_TEST_MODE OK")
         sys.exit(0)
 
-    from src.core.runtime_config import toolkit_cfg
-    from src.core.helpers import use_bat_file_to_run_cmd
+    from src.core.settings import toolkit_cfg
+
+    # ── 创建数据目录（原 constants.py 的 import 副作用，现显式调用） ──
+    from src.core.paths import ensure_dirs
+    ensure_dirs()
 
     # ── 日志正式初始化（UI 启动后，数据目录确认存在） ──
-    from src.utils.system.logger import init
+    from src.utils.logger import init
     init(os.path.dirname(toolkit_cfg.config_file_path))
-
-    # ── AUMID 自愈注册：确保 Toast 通知来源显示为 OsEasy-ToolKit（失败不影响启动） ──
-    try:
-        from src.utils.system.aumid import register_aumid
-        _tk_root = os.path.dirname(os.path.abspath(__file__))
-        register_aumid(
-            app_id="OsEasy-ToolKit",
-            args=f'"{os.path.join(_tk_root, "main.py")}"',
-            workdir=_tk_root,
-            icon=os.path.join(_tk_root, "logo.ico"),
-        )
-    except Exception:
-        _log_exception("AUMID 注册失败（忽略，不影响启动）")
-
-    # 首次启动时的特殊操作
-    fstst = toolkit_cfg.first_launch_check()
-    if fstst == True:
-        autodesk_dll = r"C:\Program Files\Autodesk\Autodesk Sync\AdSyncNamespace.dll"
-        if os.path.exists(autodesk_dll):
-            use_bat_file_to_run_cmd(
-                f'rename "{autodesk_dll}" "AdSyncNamespace.dll.bak"'
-            )
-    # fixed pyqt bind to autodesk360 dll
 
     # 启动时自动增量备份关键文件（已有则跳过）
     from src.modules.file_handler import backup_oe_files
     backup_oe_files(skip_existing=True)
 
-    import flet as ft
     from src.gui.app import ToolKit
-    from src.utils.program.flet_client_rename import apply_flet_client_rename
 
-    # 以自定义进程名（ToolKitClient.exe）启动 flet 桌面客户端，
-    # 规避部分设备的进程名黑名单（如 flet.exe 被禁止运行）。
-    apply_flet_client_rename()
-
-    ft.app(target=ToolKit.main)
+    # 启动 GUI
+    ToolKit.main()
 
 except SystemExit:
     raise
