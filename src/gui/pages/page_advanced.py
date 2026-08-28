@@ -48,6 +48,28 @@ class PageAdvanced:
         btn_crash.pack(fill=tk.X, padx=2, pady=5)
         ui.bind_tooltip(btn_crash, "FUNC_CRASH_SEND")
 
+        # ---- 学生端安装测试 ----
+        install_frame = ttk.LabelFrame(ctrl_frame, text="学生端安装测试", padding=5)
+        install_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(install_frame, text="在指定目录下注册 MMPC 服务、安装管控驱动、添加防火墙规则。",
+                  foreground="gray").pack(anchor=tk.W, padx=2)
+
+        ttk.Label(install_frame, text="学生端套件目录（含 MMPC.exe / DriverInstall.exe）:").pack(anchor=tk.W, padx=2)
+        self.install_dir = ttk.Entry(install_frame)
+        from src.core.settings import toolkit_cfg
+        self.install_dir.insert(0, toolkit_cfg.oseasy_path)
+        self.install_dir.pack(fill=tk.X, padx=2, pady=2)
+
+        btn_install = ttk.Button(install_frame, text="生成并运行安装测试脚本",
+                   command=self._do_install_test)
+        btn_install.pack(fill=tk.X, padx=2, pady=5)
+        ui.bind_tooltip(btn_install, "FUNC_INSTALL_STUDENT_TEST")
+
+        btn_uninstall = ttk.Button(install_frame, text="生成并运行卸载测试脚本",
+                   command=self._do_uninstall_test)
+        btn_uninstall.pack(fill=tk.X, padx=2, pady=5)
+        ui.bind_tooltip(btn_uninstall, "FUNC_UNINSTALL_STUDENT_TEST")
+
         # ---- 下部：输出区域（固定底部） ----
         output_frame = ttk.Frame(frame)
         output_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=5, pady=2)
@@ -79,3 +101,53 @@ class PageAdvanced:
         self.ui.clear_text(self.result_text)
         self.ui.append_text(self.result_text, f"正在向 {ip}:{port} 发送崩溃指令...", ui.root)
         ui._run_in_thread(_run, "远程崩溃")
+
+    def _do_install_test(self):
+        """生成并运行学生端安装测试脚本"""
+        ui = self.ui
+        base = self.install_dir.get().strip()
+        from src.core.settings import toolkit_cfg
+        if not base:
+            base = toolkit_cfg.oseasy_path
+        import os
+        if not os.path.isdir(base):
+            ui.show_snakemessage(f"目录不存在: {base}")
+            return
+
+        from src.modules.script_generator import script_gen
+
+        def _on_output(line):
+            self.ui.append_text(self.result_text, line, ui.root)
+
+        def _run():
+            path = script_gen.run_install_student_test(on_output=_on_output)
+            self.ui.append_text(self.result_text, f"安装测试脚本已运行: {path}", ui.root)
+
+        self.ui.clear_text(self.result_text)
+        self.ui.append_text(self.result_text, f"正在生成并运行安装测试脚本（目录: {base}）...", ui.root)
+        ui._run_in_thread(_run, "学生端安装测试")
+
+    def _do_uninstall_test(self):
+        """生成并运行学生端卸载测试脚本"""
+        ui = self.ui
+        base = self.install_dir.get().strip()
+        from src.core.settings import toolkit_cfg
+        if not base:
+            base = toolkit_cfg.oseasy_path
+        import os
+        if not os.path.isdir(base):
+            ui.show_snakemessage(f"目录不存在: {base}")
+            return
+
+        from src.modules.script_generator import script_gen
+
+        def _on_output(line):
+            self.ui.append_text(self.result_text, line, ui.root)
+
+        def _run():
+            path = script_gen.run_uninstall_student_test(on_output=_on_output)
+            self.ui.append_text(self.result_text, f"卸载测试脚本已运行: {path}", ui.root)
+
+        self.ui.clear_text(self.result_text)
+        self.ui.append_text(self.result_text, f"正在生成并运行卸载测试脚本（目录: {base}）...", ui.root)
+        ui._run_in_thread(_run, "学生端卸载测试")

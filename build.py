@@ -35,12 +35,12 @@ UPX_DIR = Path("tools")
 UPX_EXE = UPX_DIR / f"upx-{UPX_VERSION}-win64" / "upx.exe"
 
 # 多个下载源（GitHub + 镜像），按顺序尝试
+# 注意：ghproxy.com / fastgit 等老镜像已关停，仅保留仍可用的代理
 UPX_URLS = [
     f"https://github.com/upx/upx/releases/download/v{UPX_VERSION}/{UPX_ZIP}",
-    f"https://ghproxy.com/https://github.com/upx/upx/releases/download/v{UPX_VERSION}/{UPX_ZIP}",
-    f"https://hub.fastgit.xyz/upx/upx/releases/download/v{UPX_VERSION}/{UPX_ZIP}",
-    f"https://download.fastgit.org/upx/upx/releases/download/v{UPX_VERSION}/{UPX_ZIP}",
-    f"https://mirror.ghproxy.com/https://github.com/upx/upx/releases/download/v{UPX_VERSION}/{UPX_ZIP}",
+    f"https://gh-proxy.com/https://github.com/upx/upx/releases/download/v{UPX_VERSION}/{UPX_ZIP}",
+    f"https://ghfast.top/https://github.com/upx/upx/releases/download/v{UPX_VERSION}/{UPX_ZIP}",
+    f"https://ghproxy.net/https://github.com/upx/upx/releases/download/v{UPX_VERSION}/{UPX_ZIP}",
 ]
 
 # ---- UPX 管理 ----
@@ -115,18 +115,16 @@ def install_dependencies():
             if line and not line.startswith("#"):
                 reqs.append(line)
 
-    # 用 pip show 检测已安装（100% 准确，不依赖 importlib.metadata 名称映射）
+    # 用 importlib.metadata 检测已安装（一次查询所有包，比逐条 pip show 快很多）
+    import importlib.metadata
     missing = []
     skipped = []
     for req in reqs:
         pkg_name = req.split("==")[0].split(">=")[0].split("<=")[0].split(">")[0].split("<")[0].strip()
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "show", pkg_name],
-            capture_output=True, text=True
-        )
-        if result.returncode == 0:
+        try:
+            importlib.metadata.version(pkg_name)
             skipped.append(pkg_name)
-        else:
+        except importlib.metadata.PackageNotFoundError:
             missing.append(req)
 
     if skipped:
@@ -158,7 +156,13 @@ def build_args():
         "--windowed",
         f"--name={APP_NAME}",
         "--manifest", "app.manifest",
+        "--noconfirm",  # 输出已存在时不交互询问，直接覆盖
     ]
+
+    # exe 文件图标（嵌入资源，任务栏/资源管理器显示 logo.ico）
+    if Path(ICON_PATH).exists():
+        args.extend(["--icon", ICON_PATH])
+        print(f"[图标] 已嵌入 exe 图标: {ICON_PATH}")
 
     # UPX 不压缩这些模块（避免运行时解压失败）
     args.extend(["--upx-exclude", "email*"])
@@ -175,9 +179,6 @@ def build_args():
         args.extend(["--hidden-import", m])
     args.extend(["--hidden-import", "urllib.request"])
     args.extend(["--hidden-import", "urllib.parse"])
-
-    # 路径分隔符（Windows 用 ; ）
-    datasep = ";" if os.name == "nt" else ":"
 
     # ---- 添加数据文件（打包进 exe 的资源） ----
     args.extend(["--add-data", f"Fake_SCR.py{os.pathsep}."])
@@ -271,29 +272,39 @@ def main():
     # ── 安装依赖 ──
     install_dependencies()
 
-    # ── 注入构建日期 ──
+    # ── 注入构建日期（正则替换，幂等；打包后恢复源码，避免污染 config.py） ──
+    import re
     print("[构建] 写入构建日期到 config.py ...")
     build_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     config_path = Path("config.py")
-    content = config_path.read_text(encoding="utf-8")
-    content = content.replace('BUILD_DATE = ""', f'BUILD_DATE = "{build_date}"')
+    original_cfg = config_path.read_text(encoding="utf-8")
+    content = re.sub(
+        r'BUILD_DATE = "[^"]*"',
+        f'BUILD_DATE = "{build_date}"',
+        original_cfg,
+        count=1,
+    )
     config_path.write_text(content, encoding="utf-8")
     print(f"[构建] 构建日期: {build_date}")
 
-    # 构建命令
-    args = build_args()
+    try:
+        # 构建命令
+        args = build_args()
 
-    # 删除旧的 .spec 文件（防止残留硬编码路径）
-    spec_file = Path(f"{APP_NAME}.spec")
-    if spec_file.exists():
-        spec_file.unlink()
-        print(f"[清理] 已删除旧 spec: {spec_file}")
+        # 删除旧的 .spec 文件（防止残留硬编码路径）
+        spec_file = Path(f"{APP_NAME}.spec")
+        if spec_file.exists():
+            spec_file.unlink()
+            print(f"[清理] 已删除旧 spec: {spec_file}")
 
-    cmd = [sys.executable, "-m", "PyInstaller"] + args
-    print(f"[执行] pyinstaller {' '.join(args[:5])} ...")
-    print()
+        cmd = [sys.executable, "-m", "PyInstaller"] + args
+        print(f"[执行] pyinstaller {' '.join(args[:5])} ...")
+        print()
 
-    result = subprocess.run(cmd, cwd=os.getcwd())
+        result = subprocess.run(cmd, cwd=os.getcwd())
+    finally:
+        # 无论成败都恢复 config.py 源码（避免 BUILD_DATE 被持久修改）
+        config_path.write_text(original_cfg, encoding="utf-8")
 
     if result.returncode == 0:
         dist_path = Path("dist") / (APP_NAME + (".exe" if ONE_FILE else ""))

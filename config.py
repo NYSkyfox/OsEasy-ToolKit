@@ -2,7 +2,7 @@
 # 工具箱静态配置信息
 
 # 基础信息
-APP_NAME = "OsEasy-Trainer"
+APP_NAME = "OsEasy-ToolKit"
 APP_VERSION = "1.9.0"
 RELEASE_NAME = f"{APP_NAME} v{APP_VERSION}"
 SOURCE_NAME = "ToolKit"
@@ -61,6 +61,8 @@ DEFAULT_ACCENT_COLOR = "#3B8a67"
 KILLER_BAT = "Process-Killer_Student.bat"
 KILLER_ALL_BAT = "Process-Killer_All.bat"
 FILE_DEL_BAT = "Files-Delete.bat"
+INSTALL_STUDENT_TEST_BAT = "Install_Student_test.bat"
+UNINSTALL_STUDENT_TEST_BAT = "Uninstall_Student_test.bat"
 UNLOCK_NET_BAT = "Unlock-Network.bat"
 UNLOCK_USB_BAT = "Unlock-USB.bat"
 UNLOCK_USB_PS1 = "Unlock-USB.ps1"
@@ -178,4 +180,8 @@ TOOLTIPS = {
     "FUNC_CRASH_PORT":    "目标端口号，默认为噢易多媒体通信端口",
     "FUNC_CRASH_PAYLOAD": "发送的崩溃载荷内容，默认为 oshack",
     "FUNC_CRASH_SEND":    "向目标 IP 发送崩溃载荷，触发远端监控进程终止",
+
+    # ── 学生端安装测试 ──
+    "FUNC_INSTALL_STUDENT_TEST": "在指定目录生成并运行学生端轻量安装脚本（注册 MMPC/装驱动/防火墙）",
+    "FUNC_UNINSTALL_STUDENT_TEST": "在指定目录生成并运行学生端卸载脚本（停止/删除 MMPC 与管控驱动/删防火墙）",
 }
