@@ -98,23 +98,18 @@ def hijack_student_restart():
     """劫持 Student.exe，移除其关机权限，使远程重启失效。
 
     流程:
-    1. 把 Student.exe 重命名为 Student_Real.exe
-    2. 注册 IFEO: Student.exe → launcher.bat
-    3. launcher 摘除 SeShutdownPrivilege 后启动 Student_Real.exe
+    1. 注册 IFEO: Student.exe → launcher.bat
+    2. 当 Student.exe 被启动时，launcher 临时解除 IFEO → 摘除权限 → 启动原版 Student.exe → 恢复 IFEO
+    3. 子进程继承无 SeShutdownPrivilege 的令牌，进程名保持 Student.exe（MMPC 可识别）
     """
     from src.utils.logger import info
-    from src.utils.cmd import run_sigle_cmd
     from src.utils.fs import file_exists
 
     student_path = os.path.join(toolkit_cfg.oseasy_path, "Student.exe")
-    real_path = os.path.join(toolkit_cfg.oseasy_path, "Student_Real.exe")
 
     if not file_exists(student_path):
         show_snack("未找到 Student.exe，请先执行进程管理页面的检测")
         return
-
-    if not file_exists(real_path):
-        run_sigle_cmd(f'copy "{student_path}" "{real_path}"')
 
     bat_path = _ensure_student_launcher_bat()
     add_ifeo_debugger("Student.exe", bat_path)
