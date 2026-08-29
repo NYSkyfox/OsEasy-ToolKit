@@ -128,7 +128,6 @@ OsEasy-Trainer/
         ├── script_generator.py   # 击杀/删文件脚本生成
         └── script_templates.py   # bat 脚本模板
 ```
-```
 
 ---
 
@@ -160,7 +159,7 @@ OsEasy-Trainer/
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/badge/版本-1.8.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/版本-1.9.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/github/stars/NYSkyfox/OsEasy-ToolKit?color=blue" alt="Stars">
 </p>
