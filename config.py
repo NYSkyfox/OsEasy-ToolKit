@@ -184,4 +184,7 @@ TOOLTIPS = {
     # ── 学生端安装测试 ──
     "FUNC_INSTALL_STUDENT_TEST": "在指定目录生成并运行学生端轻量安装脚本（注册 MMPC/装驱动/防火墙）",
     "FUNC_UNINSTALL_STUDENT_TEST": "在指定目录生成并运行学生端卸载脚本（停止/删除 MMPC 与管控驱动/删防火墙）",
+
+    # ── 教师端管控指令模拟 ──
+    "FUNC_TEACHER_CONTROL_SEND": "模拟教师端向学生端单播发送管控指令（UDP，UdpMessageControllerPort 默认 8040）",
 }

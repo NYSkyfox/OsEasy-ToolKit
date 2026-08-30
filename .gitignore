@@ -26,5 +26,16 @@ offline_wheels/
 flet-windows.zip
 _tmp*/
 
+# IDA 逆向分析输出（本地生成，不入库）
+ida_out/
+ida_out_stu/
+
+# 临时字符串/日志转储
+oseasy_logs.txt
+oseasy_strings.txt
+
+# 临时笔记
+new.md
+
 # 忽略 .gitignore 自身（本地维护，不入库）
 .gitignore

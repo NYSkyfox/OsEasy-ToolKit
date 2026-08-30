@@ -5,6 +5,12 @@ import tkinter as tk
 from tkinter import ttk
 
 from src.modules.remote_crasher import crash, crash_targets, expand_cidr, parse_payload, DEFAULT_PORT
+from src.modules.teacher_control import (
+    send_control, send_multi, build_packet, expand_cidr as tc_expand_cidr,
+    DEFAULT_PORT as TC_DEFAULT_PORT,
+    CMD_CALL_SIGN, CMD_REMOTE_CMD, CMD_STU_SET, CMD_EXAM_FILE_END,
+    CMD_STU_INFO, CMD_NET_LIMIT,
+)
 
 
 class PageAdvanced:
@@ -69,6 +75,50 @@ class PageAdvanced:
                    command=self._do_uninstall_test)
         btn_uninstall.pack(fill=tk.X, padx=2, pady=5)
         ui.bind_tooltip(btn_uninstall, "FUNC_UNINSTALL_STUDENT_TEST")
+
+        # ---- 教师端管控指令模拟 ----
+        tc_frame = ttk.LabelFrame(ctrl_frame, text="教师端管控指令模拟", padding=5)
+        tc_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(tc_frame, text="模拟教师端向学生端发送管控指令（单播 UDP，UdpMessageControllerPort）。",
+                  foreground="gray").pack(anchor=tk.W, padx=2)
+
+        tc_addr = ttk.Frame(tc_frame)
+        tc_addr.pack(fill=tk.X, padx=2, pady=5)
+        ttk.Label(tc_addr, text="目标 IP/网段:").pack(anchor=tk.W)
+        self.tc_ip_input = ttk.Entry(tc_addr)
+        self.tc_ip_input.pack(fill=tk.X, pady=2)
+        ttk.Label(tc_addr, text="端口:").pack(anchor=tk.W)
+        self.tc_port_input = ttk.Entry(tc_addr)
+        self.tc_port_input.insert(0, str(TC_DEFAULT_PORT))
+        self.tc_port_input.pack(fill=tk.X, pady=2)
+
+        # 命令类型下拉
+        tc_row = ttk.Frame(tc_frame)
+        tc_row.pack(fill=tk.X, padx=2, pady=5)
+        ttk.Label(tc_row, text="命令类型:").pack(anchor=tk.W)
+        self.tc_cmd_var = tk.StringVar(value="500 网络限制")
+        ttk.Combobox(
+            tc_row, textvariable=self.tc_cmd_var, state="readonly",
+            values=[
+                "11 学生呼号/点名",
+                "13 远程命令",
+                "28 学生参数配置(StuSet)",
+                "79 考试文件结束",
+                "111 学生信息登记",
+                "500 网络限制",
+            ],
+            width=28,
+        ).pack(fill=tk.X, pady=2)
+
+        ttk.Label(tc_frame, text="载荷(JSON/文本):").pack(anchor=tk.W, padx=2)
+        self.tc_payload_input = ttk.Entry(tc_frame)
+        self.tc_payload_input.insert(0, '{"network":1}')
+        self.tc_payload_input.pack(fill=tk.X, padx=2, pady=2)
+
+        btn_tc_send = ttk.Button(tc_frame, text="发送管控指令",
+                   command=self._do_teacher_control)
+        btn_tc_send.pack(fill=tk.X, padx=2, pady=5)
+        ui.bind_tooltip(btn_tc_send, "FUNC_TEACHER_CONTROL_SEND")
 
         # ---- 下部：输出区域（固定底部） ----
         output_frame = ttk.Frame(frame)
@@ -151,3 +201,56 @@ class PageAdvanced:
         self.ui.clear_text(self.result_text)
         self.ui.append_text(self.result_text, f"正在生成并运行卸载测试脚本（目录: {base}）...", ui.root)
         ui._run_in_thread(_run, "学生端卸载测试")
+
+    def _do_teacher_control(self):
+        """模拟教师端向学生端发送管控指令。"""
+        ui = self.ui
+        ip = self.tc_ip_input.get().strip()
+        if not ip:
+            ui.show_snakemessage("请先填写目标 IP/网段")
+            return
+        try:
+            port = int(self.tc_port_input.get().strip() or TC_DEFAULT_PORT)
+        except ValueError:
+            ui.show_snakemessage("端口必须是数字")
+            return
+
+        # 解析命令类型
+        cmd_map = {
+            "11 学生呼号/点名": CMD_CALL_SIGN,
+            "13 远程命令": CMD_REMOTE_CMD,
+            "28 学生参数配置(StuSet)": CMD_STU_SET,
+            "79 考试文件结束": CMD_EXAM_FILE_END,
+            "111 学生信息登记": CMD_STU_INFO,
+            "500 网络限制": CMD_NET_LIMIT,
+        }
+        cmd_type = cmd_map.get(self.tc_cmd_var.get())
+        if cmd_type is None:
+            ui.show_snakemessage("未知命令类型")
+            return
+
+        payload = self.tc_payload_input.get().encode("utf-8")
+
+        def _run():
+            if "/" in ip:
+                hosts = tc_expand_cidr(ip)
+                result = send_multi(hosts[:64], cmd_type, payload, port)
+            else:
+                result = send_control(ip, cmd_type, payload, port)
+            # 附加报文预览
+            pkt = build_packet(cmd_type, payload)
+            import binascii
+            hexstr = binascii.hexlify(pkt).decode("ascii")
+            self.ui.append_text(
+                self.result_text,
+                f"报文({len(pkt)}B) hex: {hexstr[:128]}{'...' if len(hexstr) > 128 else ''}",
+                ui.root,
+            )
+
+        self.ui.clear_text(self.result_text)
+        self.ui.append_text(
+            self.result_text,
+            f"正在向 {ip}:{port} 发送 cmdType={cmd_type} 管控指令...",
+            ui.root,
+        )
+        ui._run_in_thread(_run, "教师端管控指令")
