@@ -442,17 +442,47 @@ class Ui:
                     self._swc('guaqi_sw').value = False
                 self.show_snakemessage(status)
         else:
+            # 关键修复：挂起期间学生端进程可能被外部结束（或自行退出），
+            # 此时 resume_process 会返回“未找到进程”，旧逻辑会把它当成“恢复失败”
+            # 而把开关重新打回选中，导致用户“取消挂起永远失败、一直打钩”的死循环。
+            # 因此先判断进程是否还在：不在 = 无需恢复，直接解除挂起状态。
+            if not is_process_running(toolkit_cfg.student_exe_name):
+                resume_process("MultiClient.exe")  # 学生端没了，但 MultiClient 可能仍在，尽量恢复
+                self.guaqi_runstatus = False
+                toolkit_cfg.set_config_key_data("guaqi_enabled", False)
+                if self._swc('guaqi_sw'):
+                    self._swc('guaqi_sw').value = False
+                self.show_snakemessage(
+                    f"学生端进程 {toolkit_cfg.student_exe_name} 已不存在，已解除挂起状态"
+                )
+                return
+
             status = resume_process(toolkit_cfg.student_exe_name)
             resume_process("MultiClient.exe")
             if status is True:
                 self.guaqi_runstatus = False
                 toolkit_cfg.set_config_key_data("guaqi_enabled", False)
             else:
+                # 进程仍在但恢复失败（如权限不足）：保持挂起状态，避免与真实情况不符
                 self.guaqi_runstatus = True
                 toolkit_cfg.set_config_key_data("guaqi_enabled", True)
                 if self._swc('guaqi_sw'):
                     self._swc('guaqi_sw').value = True
                 self.show_snakemessage(status)
+
+    def on_student_killed_by_toolkit(self):
+        """工具箱内部结束了学生端进程时调用：若正在挂起，则自动解除挂起状态。
+
+        仅由工具箱自身发起的结束操作触发（见 utils/process.py::kill_process），
+        不监听外部（任务管理器等）结束的学生端进程。
+        """
+        if not self.guaqi_runstatus:
+            return
+        self.guaqi_runstatus = False
+        toolkit_cfg.set_config_key_data("guaqi_enabled", False)
+        if self._swc('guaqi_sw'):
+            self._swc('guaqi_sw').value = False
+        self.show_snakemessage("学生端进程已被结束，已解除挂起状态")
 
     # ============================================================
     #  外观 / 一言

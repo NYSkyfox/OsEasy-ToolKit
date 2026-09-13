@@ -112,6 +112,34 @@ def suspend_resume_process(process_name, option) -> str | bool:
 
 # ---- 终止进程（替代 taskkill，无黑框） ----
 
+# 工具箱内部结束学生端进程时，联动解除“挂起学生端”状态，
+# 避免出现“进程已被结束、开关却仍打钩且取消不掉”的卡死。
+# 注意：只覆盖工具箱自己发起的结束；外部（任务管理器等）结束不在监听范围。
+_STUDENT_PROCESS_ALIASES = ("Student.exe", "MmcStudent.exe")
+
+
+def _is_student_process(name) -> bool:
+    """判断被结束的进程是否为学生端（含常见别名/当前检测到的进程名）"""
+    if not name:
+        return False
+    if name in _STUDENT_PROCESS_ALIASES:
+        return True
+    try:
+        from src.core.settings import toolkit_cfg
+        return name == getattr(toolkit_cfg, "student_exe_name", None)
+    except Exception:
+        return False
+
+
+def _notify_student_killed() -> None:
+    """通知 UI：工具箱内部结束了学生端进程"""
+    try:
+        from src.core.bridge import notify_student_killed
+        notify_student_killed()
+    except Exception:
+        pass
+
+
 def kill_process(process_name) -> bool:
     """终止指定名称的所有进程（含子进程树），无黑框、无子进程。
     返回 True 表示所有找到的进程均已发出终止请求。"""
@@ -128,6 +156,9 @@ def kill_process(process_name) -> bool:
                 debug(f"已终止进程 {process_name} (PID {proc.info['pid']})")
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             continue
+    # 若是工具箱内部结束了学生端进程，联动解除“挂起学生端”状态
+    if killed_any and _is_student_process(process_name):
+        _notify_student_killed()
     return killed_any
 
 
