@@ -1,3 +1,40 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.installed.cfg
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+
+# 打包产物
+*.spec
+*.exe
+*.pyd
+
+# 备份 / 日志 / 运行时产物
 *.bak
+*.duo_open.bak
+*.log
+netctrl_capture.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 工作区临时
+builds/
+*.tmp

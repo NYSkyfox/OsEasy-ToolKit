@@ -1,0 +1,2 @@
+# OsEasy ManagerHelper 仅依赖 Python 3.8+ 标准库，无需 pip 安装任何第三方包。
+# 本文件留空，仅作占位说明。
