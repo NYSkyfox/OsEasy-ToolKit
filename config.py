@@ -118,8 +118,7 @@ TOOLTIPS = {
     # ── 其他管理页 ──
     "FUNC_DEL_SCRIPTS":       "删除工具箱生成的临时脚本文件（cmd/bat等）",
     "FUNC_FAST_SCREENSHOT":   "使用快捷键快速截取屏幕并保存到 {data_dir}",
-    "FUNC_HIJACK_SHUTDOWN":   "通过 IFEO 劫持 shutdown.exe，阻止教师端远程关机指令",
-    "FUNC_HIJACK_RESTART":    "移除学生端进程的关机权限，阻止教师端远程重启",
+    "FUNC_BLOCK_REMOTE_POWER": "patch Student.exe 的远程关机/重启函数入口，使其不执行 ExitWindowsEx（重启+关机同时拦截）",
 
     # ── 解锁管理页 ──
     "FUNC_UNLOCK_ALL":         "依次解锁网络、USB、键盘鼠标管控和屏幕广播/黑屏肃静",

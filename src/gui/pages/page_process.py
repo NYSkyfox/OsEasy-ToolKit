@@ -9,8 +9,7 @@ from src.core.settings import toolkit_cfg
 from src.modules.killer import (
     launch_oe_toolkit, is_sethc_hijacked, is_killer_protected,
 )
-from src.modules.power_control import hijack_shutdown, release_shutdown_hijack, is_shutdown_hijacked, is_shutdown_hijacked_by_others
-from src.modules.power_control import hijack_student_restart, release_student_hijack, is_student_hijacked
+from src.modules import power_control
 from src.modules.service_manager import handle_start_student_client
 from src.gui.switch import PersistentSwitch
 
@@ -20,23 +19,98 @@ class PageProcess:
     def __init__(self, ui):
         self.ui = ui
 
-    def _on_shutdown_toggle(self, e=None):
-        if e.value:
-            if is_shutdown_hijacked_by_others():
-                if messagebox.askyesno("检测到冲突", "似乎有别的程序劫持了该键值，你确定要继续吗？"):
-                    hijack_shutdown()
-                else:
-                    e.value = False
-            else:
-                hijack_shutdown()
-        else:
-            release_shutdown_hijack()
+    # ─────────────────────── 远程重启/关机拦截 ───────────────────────
 
-    def _on_student_restart_toggle(self, e=None):
-        if e.value:
-            hijack_student_restart()
-        else:
-            release_student_hijack()
+    def _open_power_dialog(self):
+        """弹出"拦截远程重启/关机"对话框，可选择文件版或内存版。"""
+        ui = self.ui
+        dlg = tk.Toplevel(ui.root)
+        dlg.title("拦截教师端远程重启/关机")
+        dlg.geometry("520x420")
+        dlg.resizable(False, False)
+        dlg.transient(ui.root)
+        dlg.grab_set()
+
+        # ── 状态区 ──
+        status_frame = ttk.LabelFrame(dlg, text="当前状态", padding=6)
+        status_frame.pack(fill=tk.X, padx=8, pady=(8, 4))
+
+        file_st = "已拦截" if power_control.is_file_patched() else "未拦截"
+        try:
+            found, mem_patched, mem_detail = power_control.is_memory_patched()
+            mem_st = "已拦截" if (found and mem_patched) else ("未拦截" if found else "进程未运行")
+        except Exception:
+            mem_st = "未知"
+
+        ttk.Label(status_frame, text=f"文件版: {file_st}    内存版: {mem_st}",
+                  font=("", 10, "bold")).pack(anchor=tk.W)
+
+        # ── 模式选择 ──
+        mode_frame = ttk.LabelFrame(dlg, text="运行方式", padding=6)
+        mode_frame.pack(fill=tk.X, padx=8, pady=4)
+        mode_var = tk.StringVar(value="memory")  # 默认内存版
+        rb_file = ttk.Radiobutton(mode_frame, text="文件版 —— 改磁盘 Student.exe（持久，需先结束学生端再重启）",
+                                  variable=mode_var, value="file")
+        rb_file.pack(anchor=tk.W, padx=2, pady=1)
+        rb_mem = ttk.Radiobutton(mode_frame, text="内存版 —— 改运行中进程内存（即时生效，进程重启自动恢复，需管理员）",
+                                 variable=mode_var, value="memory")
+        rb_mem.pack(anchor=tk.W, padx=2, pady=1)
+
+        # ── 按钮区 ──
+        btn_frame = ttk.Frame(dlg, padding=(8, 4))
+        btn_frame.pack(fill=tk.X)
+        btn_patch = ttk.Button(btn_frame, text="执行拦截", command=lambda: _do("patch"))
+        btn_patch.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+        btn_restore = ttk.Button(btn_frame, text="执行还原", command=lambda: _do("restore"))
+        btn_restore.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+        ttk.Button(dlg, text="关闭", command=dlg.destroy).pack(pady=(4, 8))
+
+        # ── 结果区 ──
+        result_frame = ttk.LabelFrame(dlg, text="结果", padding=4)
+        result_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
+        result_text = tk.Text(result_frame, height=8, background="#1e1e1e",
+                              foreground="#d4d4d4", font=("Consolas", 9),
+                              state=tk.DISABLED, wrap=tk.WORD)
+        sb = ttk.Scrollbar(result_frame, command=result_text.yview)
+        result_text.configure(yscrollcommand=sb.set)
+        result_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        def _append(msg):
+            result_text.configure(state=tk.NORMAL)
+            result_text.insert(tk.END, msg + "\n")
+            result_text.see(tk.END)
+            result_text.configure(state=tk.DISABLED)
+
+        def _do(action):
+            mode = mode_var.get()
+            btn_patch.config(state="disabled")
+            btn_restore.config(state="disabled")
+            _append(f"\n--- {action} ({mode}) ---")
+            try:
+                if action == "patch":
+                    ok, msg = power_control.patch(mode)
+                else:
+                    ok, msg = power_control.restore(mode)
+                _append(msg)
+                _append("=> " + ("成功" if ok else "失败"))
+                # 刷新状态
+                file_st2 = "已拦截" if power_control.is_file_patched() else "未拦截"
+                try:
+                    f2, m2, _ = power_control.is_memory_patched()
+                    mem_st2 = "已拦截" if (f2 and m2) else ("未拦截" if f2 else "进程未运行")
+                except Exception:
+                    mem_st2 = "未知"
+            except Exception as e:
+                _append(f"异常: {e!r}")
+            finally:
+                btn_patch.config(state="normal")
+                btn_restore.config(state="normal")
+                # 更新状态标签（重新读取）
+                # 简单做法：直接关弹窗让用户重新打开看状态
+                # 或者用 after 更新（这里用简单方案）
+
+    # ─────────────────────── UI 构建 ───────────────────────
 
     def build(self):
         ui = self.ui
@@ -73,18 +147,10 @@ class PageProcess:
         # 防护（从原"其他管理"页移入）
         protect_frame = ttk.LabelFrame(ctrl_frame, text="防护", padding=5)
         protect_frame.pack(fill=tk.X, pady=2)
-        sw1 = PersistentSwitch(protect_frame,
-                               label="拦截教师端远程关机 (劫持shutdown.exe)",
-                               live_getter=is_shutdown_hijacked, verifier=is_shutdown_hijacked,
-                               on_toggle=self._on_shutdown_toggle)
-        sw1.pack(fill=tk.X, padx=2, pady=1)
-        ui.bind_tooltip(sw1, "FUNC_HIJACK_SHUTDOWN")
-        sw2 = PersistentSwitch(protect_frame,
-                               label="拦截教师端远程重启 (摘Student关机权限)（请勿尝试，暂不可用）",
-                               live_getter=is_student_hijacked, verifier=is_student_hijacked,
-                               on_toggle=self._on_student_restart_toggle)
-        sw2.pack(fill=tk.X, padx=2, pady=1)
-        ui.bind_tooltip(sw2, "FUNC_HIJACK_RESTART")
+        btn_power = ttk.Button(protect_frame, text="拦截教师端远程重启/关机",
+                               command=self._open_power_dialog)
+        btn_power.pack(fill=tk.X, padx=2, pady=1)
+        ui.bind_tooltip(btn_power, "FUNC_BLOCK_REMOTE_POWER")
 
         quick_frame = ttk.LabelFrame(ctrl_frame, text="快捷操作", padding=5)
         quick_frame.pack(fill=tk.X, pady=2)
