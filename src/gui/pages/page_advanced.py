@@ -8,7 +8,7 @@ from src.modules.remote_crasher import (
     crash, crash_targets, expand_cidr, parse_payload, DEFAULT_PORT,
     build_original_payload, RESULT_OK, RESULT_FAIL,
 )
-from src.modules.teacher_control import listen_teacher_ip
+from src.modules.teacher_control import listen_teacher_ip, read_local_channel
 from src.utils.logger import info, warn, error, debug
 
 
@@ -139,9 +139,18 @@ class PageAdvanced:
         self._auto_busy = True
         self.btn_auto_teacher.config(state="disabled", text="监听中…")
 
+        # 先读本机频道（2^N 位掩码），用于过滤 teacherip 广播
+        ch_num, ch_mask = read_local_channel()
+        if ch_mask is not None:
+            ui.append_text(self.result_text,
+                           f"[自动获取] 本机频道 {ch_num} → 只接受 channel={ch_mask} 的广播", ui.root)
+        else:
+            ui.append_text(self.result_text,
+                           "[自动获取] 未找到 core.conf，接受任意频道广播", ui.root)
+
         def _run():
             try:
-                tip = listen_teacher_ip(timeout=8.0)
+                tip = listen_teacher_ip(timeout=8.0, expected_channel=ch_mask)
             except OSError as exc:
                 tip = None
                 err = str(exc)

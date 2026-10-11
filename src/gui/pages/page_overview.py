@@ -3,10 +3,12 @@
 
 import tkinter as tk
 from tkinter import ttk
+import threading
 
 from src.core.settings import toolkit_cfg
 from src.modules.service_manager import query_service_state
 from src.utils.process import is_process_running
+from src.modules.teacher_control import read_local_channel, listen_teacher_ip
 
 
 class PageOverview:
@@ -53,6 +55,38 @@ class PageOverview:
         self._student_ver_ok = None
 
         self.update_student_info()
+
+        # ---- 教师端信息 ----
+        teacher_frame = ttk.LabelFrame(scroll_frame, text="教师端信息", padding=8)
+        teacher_frame.pack(fill=tk.X, padx=5, pady=2)
+        teacher_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(teacher_frame, text="教师频道", width=12, anchor=tk.W).grid(
+            row=0, column=0, sticky=tk.W, padx=(0, 6), pady=2)
+        self.teacher_ch_var = tk.StringVar(value="检测中...")
+        self.teacher_ch_lbl = ttk.Label(teacher_frame, textvariable=self.teacher_ch_var,
+                                        anchor=tk.W, foreground="gray")
+        self.teacher_ch_lbl.grid(row=0, column=1, sticky=tk.W, pady=2)
+
+        ttk.Label(teacher_frame, text="教师端 IP", width=12, anchor=tk.W).grid(
+            row=1, column=0, sticky=tk.W, padx=(0, 6), pady=2)
+        self.teacher_ip_var = tk.StringVar(value="未获取")
+        self.teacher_ip_lbl = ttk.Label(teacher_frame, textvariable=self.teacher_ip_var,
+                                        anchor=tk.W, foreground="gray")
+        self.teacher_ip_lbl.grid(row=1, column=1, sticky=tk.W, pady=2)
+
+        btn_get_ip = ttk.Button(teacher_frame, text="获取教师端 IP",
+                                command=self._do_get_teacher_ip)
+        btn_get_ip.grid(row=2, column=1, sticky=tk.E, pady=(4, 0))
+        ui.bind_tooltip(btn_get_ip, "FUNC_GET_TEACHER_IP")
+        self._teacher_ip_btn = btn_get_ip
+
+        self._teacher_ip = None
+        self._teacher_ip_busy = False
+        self._teacher_ch_mask = None
+        self._update_teacher_channel()
+        # 首次自动获取一次（UI 就绪后）
+        self.ui.root.after(150, self._do_get_teacher_ip)
 
         # ---- 服务 + 进程 并排双列 ----
         svc_proc_row = ttk.Frame(scroll_frame)
@@ -217,6 +251,67 @@ class PageOverview:
         name_lbl = getattr(self, "_student_exe_name_lbl", None)
         if name_lbl is not None:
             name_lbl.configure(text=toolkit_cfg.student_exe_name)
+
+        # 学生端路径变化时，频道可能也跟着变，重新读一次
+        self._update_teacher_channel()
+
+    # ─────────────────────── 教师端信息 ───────────────────────
+
+    def _update_teacher_channel(self):
+        """从 skin/core.conf 读频道，更新教师频道显示，缓存位掩码。"""
+        try:
+            ch_num, ch_mask = read_local_channel()
+            if ch_mask is not None:
+                self._teacher_ch_mask = ch_mask
+                self.teacher_ch_var.set(f"频道 {ch_num} (channel={ch_mask})")
+                self.teacher_ch_lbl.configure(foreground="green")
+            else:
+                self._teacher_ch_mask = None
+                self.teacher_ch_var.set("未找到 core.conf")
+                self.teacher_ch_lbl.configure(foreground="orange")
+        except Exception:
+            self._teacher_ch_mask = None
+            self.teacher_ch_var.set("读取失败")
+            self.teacher_ch_lbl.configure(foreground="red")
+
+    def _do_get_teacher_ip(self):
+        """后台监听 7777 教师广播（按本机频道过滤），获取教师机 IP。"""
+        if getattr(self, "_teacher_ip_busy", False):
+            return
+        # 频道可能已变，刷新一次
+        self._update_teacher_channel()
+        self._teacher_ip_busy = True
+        self.teacher_ip_var.set("获取中...")
+        self.teacher_ip_lbl.configure(foreground="gray")
+        btn = getattr(self, "_teacher_ip_btn", None)
+        if btn:
+            btn.configure(state="disabled", text="监听中...")
+
+        ch_mask = self._teacher_ch_mask
+        root = self.ui.root
+
+        def _run():
+            try:
+                tip = listen_teacher_ip(timeout=8.0, expected_channel=ch_mask)
+            except OSError:
+                tip = None
+            root.after(0, lambda: self._teacher_ip_done(tip))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _teacher_ip_done(self, tip):
+        """主线程回调：填入教师 IP。"""
+        self._teacher_ip_busy = False
+        btn = getattr(self, "_teacher_ip_btn", None)
+        if btn:
+            btn.configure(state="normal", text="获取教师端 IP")
+        if tip:
+            self._teacher_ip = tip
+            self.teacher_ip_var.set(tip)
+            self.teacher_ip_lbl.configure(foreground="green")
+        else:
+            self.teacher_ip_var.set("未获取（教师端不在线或未同频道）")
+            self.teacher_ip_lbl.configure(foreground="orange")
 
     def _refresh(self):
         ui = self.ui

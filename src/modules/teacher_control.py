@@ -37,6 +37,8 @@
 #   ⚠️ 待动态验证：/*// 后是否直接跟 JSON；数组是否按位携带；
 #      其他 cmdType（11/13/28/79/111）的载荷结构
 
+import os
+import re
 import time
 import json
 import socket
@@ -440,7 +442,48 @@ def discover_students(cidr: str, port: int = DEFAULT_PORT, timeout: float = 0.35
 net_limit_payload_old = net_limit_payload
 
 
-# ══════════════════════════ 教师端自动发现 ══════════════════════════
+# ══════════════════════════ 教师端自动发现（频道过滤版） ══════════════════════════
+
+# 学生端默认安装目录（用于查找 skin/core.conf 获取频道）
+_DEFAULT_STUDENT_DIRS = (
+    r"C:\Program Files (x86)\Os-Easy\os-easy multicast teaching system",
+    r"C:\Program Files\Os-Easy\os-easy multicast teaching system",
+    r"D:\Os-Easy\os-easy multicast teaching system",
+)
+
+
+def read_local_channel(student_dir: str = None):
+    """从 skin/core.conf 读取当前频道号，返回 (N, 2^N) 或 (None, None)。
+
+    Args:
+        student_dir: 学生端安装目录。为 None 时自动探测默认路径，
+                     也尝试 toolkit_cfg.oseasy_path。
+    """
+    from src.core.settings import toolkit_cfg
+    candidates = []
+    if student_dir:
+        candidates.append(os.path.join(student_dir, "skin", "core.conf"))
+    # 优先用工具箱配置的学生端路径
+    oe_path = getattr(toolkit_cfg, "oseasy_path", "")
+    if oe_path:
+        candidates.append(os.path.join(oe_path, "skin", "core.conf"))
+    # 默认路径
+    for d in _DEFAULT_STUDENT_DIRS:
+        candidates.append(os.path.join(d, "skin", "core.conf"))
+    for conf_path in candidates:
+        if not os.path.isfile(conf_path):
+            continue
+        try:
+            with open(conf_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except OSError:
+            continue
+        m = re.search(r"/channel/(\d+)/", content)
+        if m:
+            n = int(m.group(1))
+            return n, (1 << n)
+    return None, None
+
 
 def _is_private_ip(ip: str) -> bool:
     """局域网私有地址判断（仅接受可能承载教师机的内网来源）。"""
@@ -459,12 +502,20 @@ def _is_private_ip(ip: str) -> bool:
     return False
 
 
-def _parse_teacherip(data: bytes):
-    """从 7777 广播报文解析 teacher_ip。
+def _parse_teacherip(data: bytes, expected_channel: int = None):
+    """从 7777 广播报文解析 teacher_ip，可按频道过滤。
 
-    教师端 teacherip 广播是**纯 JSON 无 16B 头**，形如：
+    教师端 teacherip 广播是纯 JSON 无 16B 头，形如：
         {"channel":N,"checksum":...,"msg_id":"teacherip","teacher_ip":"<IP>"}
-    匹配到 msg_id == "teacherip" 才返回其 teacher_ip，否则返回 None。
+
+    Args:
+        data: 接收到的原始字节。
+        expected_channel: 若提供，只接受 channel == expected_channel 的报文。
+                          值应为 2^N（位掩码形式，由 read_local_channel 返回）。
+                          为 None 时不做频道过滤。
+
+    Returns:
+        匹配则返回 teacher_ip 字符串，否则 None。
     """
     try:
         txt = data.decode("utf-8", "replace").strip()
@@ -475,11 +526,20 @@ def _parse_teacherip(data: bytes):
         return None
     if obj.get("msg_id") != TEACHERIP_MSG_ID:
         return None
+    if expected_channel is not None:
+        ch = obj.get("channel")
+        if ch is not None:
+            try:
+                if int(ch) != int(expected_channel):
+                    return None
+            except (ValueError, TypeError):
+                pass
     tip = obj.get("teacher_ip")
     return tip if isinstance(tip, str) and tip else None
 
 
-def listen_teacher_ip(timeout: float = 8.0, port: int = CHANNEL_SCAN_PORT):
+def listen_teacher_ip(timeout: float = 8.0, port: int = CHANNEL_SCAN_PORT,
+                      expected_channel: int = None):
     """监听局域网内教师机的 7777 'teacherip' 广播，返回教师机 IP。
 
     教师端每 ~1 秒在 7777 端口广播一条 teacherip（含教师机 IP 与频道位）。
@@ -488,12 +548,14 @@ def listen_teacher_ip(timeout: float = 8.0, port: int = CHANNEL_SCAN_PORT):
     Args:
         timeout: 最多等待秒数（教师广播约 1s 一条，给几秒足够）。
         port:    监听的 UDP 端口（默认 7777 / ChannleScanPort）。
+        expected_channel: 频道位掩码（2^N），只接受匹配频道的广播。
+                          为 None 时接受任意频道（向后兼容）。
 
     Returns:
         找到则返回教师机 IP 字符串；超时未找到返回 None。
 
     Raises:
-        OSError: 无法绑定 7777（多半被学生端进程占用，需提示用户改用 pktmon 或确认本机未占用）。
+        OSError: 无法绑定 7777（多半被学生端进程占用）。
     """
     deadline = time.time() + float(timeout)
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -509,9 +571,10 @@ def listen_teacher_ip(timeout: float = 8.0, port: int = CHANNEL_SCAN_PORT):
             src = addr[0]
             if not _is_private_ip(src):
                 continue                      # 丢弃回环/公网源
-            tip = _parse_teacherip(data)
+            tip = _parse_teacherip(data, expected_channel=expected_channel)
             if tip:
-                info(f"教师端自动发现：来自 {src} 的 teacherip -> 教师机 {tip}")
+                ch_info = f" (频道={expected_channel})" if expected_channel else ""
+                info(f"教师端自动发现：来自 {src} 的 teacherip -> 教师机 {tip}{ch_info}")
                 return tip
         return None
     finally:

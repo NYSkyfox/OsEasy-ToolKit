@@ -100,6 +100,7 @@ BACKUP_FILES = [
 TOOLTIPS = {
     # ── 概览页 ──
     "FUNC_OVERVIEW_REFRESH": "重新检测学生端服务、进程运行状态及功能劫持状态",
+    "FUNC_GET_TEACHER_IP": "监听局域网 7777 教师广播（按本机频道过滤），自动获取教师机 IP",
 
     # ── 服务管理页 ──
     "FUNC_SVC_REFRESH": "重新检测学生端相关服务（MMPC/网络/USB/键盘/防火墙）的运行状态",
