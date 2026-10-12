@@ -5,14 +5,16 @@ tests/test_noshutdown_roundtrip.py
 ==================================
 noshutdown 文件版往返测试（纯逻辑，跨平台，无需真实样本 / 无第三方依赖）。
 
+重构后：执行逻辑统一在 src/core/va_patch.VAPatchExecutor，
+patch 点配置在 src/modules/patches/noshutdown.py（纯数据）。
+
 构造一个最小但合法的 PE32 伪样本：
-  - 单 .text 节，RVA 0x1000 .. 0x101000
-  - 目标函数 FUN_004a9660 (RVA 0x0A9660) 落在 .text 内
-  - 入口 3 字节写为原始 55 8b ec
+  - 单 .text 节，RVA 0x1000 .. 0x101000，rawptr=0x1000（rawptr 对齐）
+  - 目标点 VA 0x4A9660 (RVA 0x0A9660) 落在 .text 内，入口写原始 55 8b ec
 然后跑：
-    file_dry_run(可 patch) -> file_patch(inplace, 写入 31 c0 c3) -> 校验字节
-    -> file_restore(还原) -> 校验字节
-逐阶段断言文件字节，验证 PE 解析 / RVA 定位 / 备份还原正确性。
+  dry_run(可 patch) -> patch(inplace, 写 31 c0 c3) -> 校验字节
+  -> 重复 patch(幂等) -> status(已 patch) -> restore(还原) -> 校验
+逐阶段断言文件字节，验证 PE 解析 / VA 定位 / 备份还原正确性。
 
 内存版依赖 Windows 进程 API，本测试不覆盖（跨平台限制）。
 
@@ -28,7 +30,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from src.modules import noshutdown
+from src.core.va_patch import VAPatchExecutor
+from src.modules.patches import get_va_target
 
 PASS = 0
 FAIL = 0
@@ -38,107 +41,102 @@ def check(cond, msg):
     global PASS, FAIL
     if cond:
         PASS += 1
-        print(f"  ✓ {msg}")
+        print("  ✓ " + msg)
     else:
         FAIL += 1
-        print(f"  ✗ {msg}")
+        print("  ✗ " + msg)
 
 
-def build_fake_pe(path):
-    """构造最小 PE32，RVA 0x0A9660 -> fileoff 0x0A9660（rawptr==va==0x1000）。"""
+def build_fake_pe(path, image_base, point_va, orig):
+    """构造最小 PE32，点 VA 落在 .text 内（rawptr 对齐，off==RVA）。"""
     size = 0x100000
     blob = bytearray(b"\x00" * size)
 
-    # DOS header
     blob[0:2] = b"MZ"
     struct.pack_into("<I", blob, 0x3c, 0x80)          # e_lfanew = 0x80
-
-    # PE signature
     blob[0x80:0x84] = b"PE\0\0"
-
-    # COFF header (at 0x84): machine,nsec,ts,sym,nsym,opt_size,char
+    # COFF header @0x84: machine,nsec,ts,sym,nsym,opt_size,char
     struct.pack_into("<HHIIIHH", blob, 0x84, 0x14c, 1, 0, 0, 0, 0xE0, 0)
-
-    # Optional header (PE32, at 0x98)
     opt = 0x98
-    struct.pack_into("<H", blob, opt, 0x10b)            # magic PE32
-    struct.pack_into("<I", blob, opt + 28, 0x400000)    # ImageBase (PE32 @ +28)
-
-    # Section table (at opt + opt_size = 0x178): 1 section
+    struct.pack_into("<H", blob, opt, 0x10b)           # magic PE32
+    struct.pack_into("<I", blob, opt + 28, image_base)  # ImageBase
+    # Section table @ opt+opt_size = 0x178: 1 section
     so = 0x178
     struct.pack_into("<8s", blob, so, b".text\0\0\0")
-    # vsize, va, rawsz, rawptr  @ so+8
     struct.pack_into("<IIII", blob, so + 8, 0x100000, 0x1000, 0x100000, 0x1000)
 
-    # 目标函数入口写原始字节
-    target_off = 0x1000 + (noshutdown.FUNC_RVA - 0x1000)  # = 0x0A9660
-    blob[target_off:target_off + 3] = noshutdown.ORIG_BYTES
-
+    rva = point_va - image_base
+    off = 0x1000 + (rva - 0x1000)
+    blob[off:off + 3] = orig
     with open(path, "wb") as f:
         f.write(bytes(blob))
-    return target_off
+    return off
 
 
 def main():
+    target = get_va_target("noshutdown")
+    pt = target.files[0].patch_points[0]
+    image_base = target.image_base
+
     fd, path = tempfile.mkstemp(suffix=".exe")
     os.close(fd)
     try:
-        target_off = build_fake_pe(path)
-        print(f"── 构造伪样本，目标 fileoff=0x{target_off:06x} ──")
-        check(target_off == noshutdown.FUNC_RVA, "目标偏移 = RVA（rawptr 对齐）")
+        target_off = build_fake_pe(path, image_base, pt.va, pt.orig)
+        print("── 构造伪样本，目标 fileoff=0x%06x ──" % target_off)
+        check(target_off == pt.va - image_base, "目标偏移 = RVA（rawptr 对齐）")
 
         def silent(line):
             pass
 
-        print("── 阶段1：file_dry_run（应可 patch）──")
-        ok, pe = noshutdown.file_dry_run(path, log=silent)
+        ex = VAPatchExecutor(target, path, log=silent)
+
+        print("── 阶段1：dry_run（应可 patch）──")
+        ok = ex.dry_run(strict=True)
         check(ok, "dry-run 返回 True")
-        check(pe.target_off == target_off, f"PE 解析 target_off=0x{pe.target_off:06x}")
-        check(pe.image_base == 0x400000, f"ImageBase=0x{pe.image_base:06x}")
         with open(path, "rb") as f:
             data = f.read()
-        check(bytes(data[target_off:target_off + 3]) == noshutdown.ORIG_BYTES,
-              "文件初始入口 = 55 8b ec")
+        check(bytes(data[target_off:target_off + 3]) == pt.orig,
+              "文件初始入口 = orig")
 
-        print("── 阶段2：file_patch(inplace)（写入 31 c0 c3）──")
-        pok = noshutdown.file_patch(path, inplace=True, log=silent)
-        check(pok, "file_patch 返回 True")
+        print("── 阶段2：patch(inplace)（写入 patch 字节）──")
+        pok = ex.patch(inplace=True, strict=True)
+        check(pok, "patch 返回 True")
         with open(path, "rb") as f:
             data = f.read()
-        check(bytes(data[target_off:target_off + 3]) == noshutdown.PATCH_BYTES,
-              "patch 后入口 = 31 c0 c3")
-        check(os.path.exists(path + noshutdown.BACKUP_EXT), "已生成 .noshutdown.bak")
-        with open(path + noshutdown.BACKUP_EXT, "rb") as f:
+        check(bytes(data[target_off:target_off + 3]) == pt.new,
+              "patch 后入口 = %s" % pt.new.hex(" "))
+        check(os.path.exists(path + target.backup_ext), "已生成备份")
+        with open(path + target.backup_ext, "rb") as f:
             bak = f.read()
-        check(bytes(bak[target_off:target_off + 3]) == noshutdown.ORIG_BYTES,
-              "备份中为原始 55 8b ec")
+        check(bytes(bak[target_off:target_off + 3]) == pt.orig,
+              "备份中为原始 orig")
 
-        print("── 阶段3：重复 file_patch（应幂等跳过）──")
-        pok2 = noshutdown.file_patch(path, inplace=True, strict=False, log=silent)
-        check(pok2, "重复 file_patch 返回 True（幂等）")
+        print("── 阶段3：重复 patch（应幂等跳过）──")
+        pok2 = ex.patch(inplace=True, strict=False)
+        check(pok2, "重复 patch 返回 True（幂等）")
 
-        print("── 阶段4：file_status（应显示已拦截）──")
-        st_bytes = noshutdown.file_status(path, log=silent)
-        check(st_bytes == noshutdown.PATCH_BYTES, "status 读出入口 = patch 字节")
+        print("── 阶段4：status（应显示已 patch）──")
+        st = ex.status()
+        check(st["points"][0][1] == "已 patch", "status 读出入口 = 已 patch")
 
-        print("── 阶段5：file_restore（还原）──")
-        rok = noshutdown.file_restore(path, log=silent)
-        check(rok, "file_restore 返回 True")
+        print("── 阶段5：restore（还原）──")
+        rok = ex.restore()
+        check(rok, "restore 返回 True")
         with open(path, "rb") as f:
             data = f.read()
-        check(bytes(data[target_off:target_off + 3]) == noshutdown.ORIG_BYTES,
-              "还原后入口 = 55 8b ec")
+        check(bytes(data[target_off:target_off + 3]) == pt.orig,
+              "还原后入口 = orig")
 
-        print("── 阶段6：file_dry_run（应回到可 patch）──")
-        ok3, _ = noshutdown.file_dry_run(path, log=silent)
+        print("── 阶段6：dry_run（应回到可 patch）──")
+        ok3 = ex.dry_run(strict=True)
         check(ok3, "还原后 dry-run 校验通过")
 
     finally:
-        for p in (path, path + noshutdown.BACKUP_EXT):
+        for p in (path, path + target.backup_ext):
             if os.path.exists(p):
                 os.remove(p)
 
-    print(f"\n===== 结果：{PASS} 通过 / {FAIL} 失败 =====")
+    print("\n===== 结果：%d 通过 / %d 失败 =====" % (PASS, FAIL))
     return 0 if FAIL == 0 else 1
 
 

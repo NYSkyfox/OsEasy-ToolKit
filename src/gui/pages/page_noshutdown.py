@@ -1,11 +1,11 @@
 # src/gui/pages/page_noshutdown.py
 # 拦截远程关机 / 重启页（页面 4）
 #
-# 驱动 src/modules/noshutdown.py：
-#   文件版  file_dry_run / file_patch / file_restore / file_status
-#   内存版  mem_status / mem_patch / mem_restore   （仅 Windows + 管理员）
+# 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/noshutdown 配置。
+#   文件版  —— executor.dry_run / patch / restore
+#   内存版  —— executor.mem_status / mem_patch / mem_restore（仅 Windows + 管理员）
 #
-# 输出经 ui.run_with_log 捕获（module 内部用 print / log=print）。
+# 输出经 ui.run_with_log 捕获（执行器默认 log=print）。
 
 import os
 import tkinter as tk
@@ -13,6 +13,8 @@ from tkinter import ttk, filedialog, messagebox
 
 from src.gui.widgets import make_scrollable, make_output_text, clear_text
 from src.core import resolve_target
+from src.core.va_patch import VAPatchExecutor, _is_windows
+from src.modules.patches import get_va_target
 
 
 class PageNoshutdown:
@@ -20,6 +22,7 @@ class PageNoshutdown:
     def __init__(self, ui):
         self.ui = ui
         self._after_id = None
+        self._target = get_va_target("noshutdown")
 
     def build(self):
         ui = self.ui
@@ -109,9 +112,14 @@ class PageNoshutdown:
             return None
         return p
 
+    def _executor(self, path=None):
+        """内存版不需要文件路径，但执行器构造需要；用占位（内存操作只用 sample_name）。"""
+        p = path or self.var_path.get().strip() or (
+            os.path.join("memory_only", self._target.files[0].sample_name))
+        return VAPatchExecutor(self._target, p)
+
     def _mem_guard(self):
-        from src.modules import noshutdown
-        if not noshutdown.is_windows():
+        if not _is_windows():
             messagebox.showinfo("仅 Windows",
                                 "内存版仅支持 Windows（需管理员权限）。\n"
                                 "当前运行在非 Windows 环境，无法操作进程内存。")
@@ -127,34 +135,35 @@ class PageNoshutdown:
 
     # ------------------------------------------------------------
     def _do_preview(self):
-        from src.modules import noshutdown
         if self.mode.get() == "mem":
             if not self._mem_guard():
                 return
+            ex = self._executor()
 
             def func():
-                noshutdown.mem_status()
+                ex.mem_status()
             self._run(func, "状态刷新完成", "状态读取失败，查看日志")
             return
 
         p = self._path()
         if not p:
             return
+        ex = self._executor(p)
 
         def func():
-            noshutdown.file_dry_run(p, strict=False)
+            ex.dry_run(strict=False)
         self._run(func, "预览完成（未写盘）", "预览出错，查看日志")
 
     def _do_build(self):
-        from src.modules import noshutdown
         if self.mode.get() == "mem":
             if not self._mem_guard():
                 return
             if not self.ui.confirm("将修改运行中 Student.exe 进程内存。\n需要管理员权限。继续？"):
                 return
+            ex = self._executor()
 
             def func():
-                noshutdown.mem_patch()
+                ex.mem_patch()
             self._run(func, "已拦截（内存版）", "拦截失败，查看日志")
             return
 
@@ -166,28 +175,30 @@ class PageNoshutdown:
                 "将直接修改原文件（自动生成 .noshutdown.bak 备份）。\n"
                 "请确保学生端进程已关闭。确定继续？"):
             return
+        ex = self._executor(p)
 
         def func():
-            noshutdown.file_patch(p, inplace=inplace, strict=False)
+            ex.patch(inplace=inplace, strict=False)
         self._run(func, "拦截完成", "拦截失败，查看日志")
 
     def _do_restore(self):
-        from src.modules import noshutdown
         if self.mode.get() == "mem":
             if not self._mem_guard():
                 return
+            ex = self._executor()
 
             def func():
-                noshutdown.mem_restore()
+                ex.mem_restore()
             self._run(func, "还原完成（内存版）", "还原失败，查看日志")
             return
 
         p = self._path()
         if not p:
             return
+        ex = self._executor(p)
 
         def func():
-            noshutdown.file_restore(p)
+            ex.restore()
         self._run(func, "还原完成", "还原失败，查看日志")
 
     def _open_dir(self):

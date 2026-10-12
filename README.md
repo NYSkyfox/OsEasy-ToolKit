@@ -34,19 +34,21 @@ OsEasy-ManagerHelper/
 ├── README.md
 │
 ├── src/
-│   ├── core/                # ── 核心层 ──
+│   ├── core/                # ── 核心层：纯逻辑，零 UI 依赖 ──
 │   │   ├── paths.py         #     安装目录探测 + 数据目录
 │   │   ├── fingerprint.py   #     MD5 / 大小指纹
-│   │   └── patch_engine.py  #     PatchPoint/PatchTarget/PatchEngine（apply/restore/status/dry_run）
+│   │   ├── patch_engine.py  #     固定偏移型引擎（PatchTarget/PatchEngine）
+│   │   └── va_patch.py      #     VA 型统一执行器（PE 解析 / shellcode / 内存版 / BMP）
 │   │
-│   ├── patches/             # ── 固定偏移 patch（注册表驱动） ──
+│   ├── patches/             # ── 固定偏移 patch（注册表驱动，引擎型） ──
 │   │   ├── multiclient_disable.py    # 禁用教学管控
 │   │   └── screenrender_windowed.py  # 屏幕广播窗口化
 │   │
-│   ├── modules/             # ── PE+VA+shellcode 型工具（独立维护） ──
-│   │   ├── duo_open.py            # 双开教师端/学生端
-│   │   ├── screen_capture.py      # 阻止/使用假屏幕截图
-│   │   └── noshutdown.py          # 拦截远程关机/重启（文件版+内存版）
+│   ├── modules/             # ── VA 型 patch：纯配置（无执行逻辑） ──
+│   │   └── patches/           #   每个文件一个 VA_PatchTarget（patch 点数据）
+│   │       ├── duo_open.py            # 双开教师端/学生端
+│   │       ├── screen_capture.py      # 阻止/使用假屏幕截图（nop + 假截图）
+│   │       └── noshutdown.py          # 拦截远程关机/重启（文件版+内存版）
 │   │
 │   └── gui/                 # ── 界面层 ──
 │       ├── app.py           #     主框架（顶部导航 + 内容区 + 状态栏）
@@ -65,10 +67,12 @@ OsEasy-ManagerHelper/
 
 ## 分层约定
 
-- **core**：纯逻辑，零 UI 依赖。`patch_engine` 是统一引擎，GUI 与 CLI 共用。
-- **patches**：固定偏移 patch 目标，每个文件定义一个 `PatchTarget` 并注册到 `__init__.ALL_TARGETS`；新增工具 = 加一个文件 + 一行注册，GUI/CLI 自动发现。
-- **modules**：`PE+VA+shellcode` 型工具，逻辑与偏移型差异大，独立维护、自带核心函数。
-- **gui**：只负责展示与交互，调用 core/patches/modules，不含业务逻辑。
+- **core**：纯逻辑，零 UI 依赖。两套执行引擎：
+  - `patch_engine`（固定偏移型）：`PatchTarget` + `PatchEngine`，GUI/CLI 共用。
+  - `va_patch`（VA 型统一执行器）：`VAPatchExecutor`，含 PE 解析 / VA→偏移 / shellcode 生成 / 内存版 / BMP 处理，是**唯一**执行 VA 型 patch 的入口。
+- **patches**：固定偏移 patch 目标（引擎型），每个文件定义一个 `PatchTarget` 并注册到 `__init__.ALL_TARGETS`；新增工具 = 加一个文件 + 一行注册，GUI 自动发现。
+- **modules/patches**：VA 型 patch 的**纯配置**（每个文件一个 `VA_PatchTarget`，仅 patch 点数据，无执行逻辑），由 `va_patch.VAPatchExecutor` 读取后执行；新增工具 = 加一个配置 + 一行注册。
+- **gui**：只负责展示与交互，调用 core 执行器 + 读取 patches/modules 配置，不含业务逻辑。
 
 ## 安全说明
 

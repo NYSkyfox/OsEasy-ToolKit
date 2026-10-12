@@ -1,13 +1,14 @@
 # src/gui/pages/page_capture.py
 # 截屏页（页面 3）—— 阻止 / 使用假屏幕截图
 #
-# 驱动 src/modules/screen_capture.py：
-#   process_one(dll_path, targets, dry_run, inplace, strict, fake_screen, convert_bmp)
-#     targets 用于 NOP 模式（key 列表，默认 ['pipeline']）
-#     fake_screen 非空时进入假截图模式（BMP 路径）
-#   restore_one(dll_path)
+# 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/screen_capture 配置。
+# 配置含 5 个点：4 个 NOP 点（pipeline/bplt/screenrender/wsasend）+ 1 个假截图 shellcode 点。
 #
-# 输出经 ui.run_with_log 捕获（module 内部用 print）。
+# 两种工作模式（对应 GUI 单选）：
+#   nop   —— 勾选要 patch 的 NOP 点（默认 pipeline），传入 labels
+#   fake  —— 用本地 BMP 替换 BitBlt（传 labels=["fake_screen"] + fake_screen=BMP 路径）
+#
+# 输出经 ui.run_with_log 捕获（执行器默认 log=print）。
 
 import os
 import tkinter as tk
@@ -15,7 +16,16 @@ from tkinter import ttk, filedialog, messagebox
 
 from src.gui.widgets import make_scrollable, make_output_text, clear_text
 from src.core import resolve_target
-from src.modules import screen_capture as sc
+from src.core.va_patch import VAPatchExecutor, validate_bmp, convert_bmp_topdown
+from src.modules.patches import get_va_target
+
+# NOP 点标签的中文说明（用于复选框显示）
+_NOP_DESC = {
+    "pipeline": "屏幕截图完整流水线（截屏→编码→BMP→WSASend）",
+    "bplt": "BitBlt 全屏截图",
+    "screenrender": "ScreenRender 子进程启动（远程监视推流）",
+    "wsasend": "WSASend 通用网络发送（影响面大）",
+}
 
 
 class PageCapture:
@@ -23,12 +33,14 @@ class PageCapture:
     def __init__(self, ui):
         self.ui = ui
         self._after_id = None
+        self._nop_vars = {}     # label -> BooleanVar
 
     def build(self):
         ui = self.ui
         frame = ttk.Frame(ui.notebook)
         self._frame = frame
         _, scroll = make_scrollable(frame)
+        self._target = get_va_target("screen_capture")
 
         # ── 目标 DLL ──
         ff = ttk.LabelFrame(scroll, text="目标文件", padding=8)
@@ -53,9 +65,16 @@ class PageCapture:
                         variable=self.mode_var, value="fake").grid(
             row=1, column=0, columnspan=2, sticky=tk.W, padx=4)
 
-        # ── 假截图 BMP（fake 模式才生效） ──
-        self._bmp_frame = ttk.LabelFrame(scroll, text="假截图 BMP（32bpp 无压缩，路径 ≤ 23 字符）",
-                                         padding=8)
+        # ── NOP 点选择（nop 模式才显示） ──
+        nf = ttk.LabelFrame(scroll, text="NOP 模式 · 选择要 patch 的点", padding=8)
+        self._nop_frame = nf
+        nf.columnconfigure(1, weight=1)
+        self._build_nop_checkboxes(nf)
+
+        # ── 假截图 BMP（fake 模式才显示） ──
+        self._bmp_frame = ttk.LabelFrame(
+            scroll, text="假截图 BMP（32bpp 无压缩，路径 ≤ %d 字符）" %
+            self._target.shellcode_max_fp, padding=8)
         self._bmp_frame.columnconfigure(1, weight=1)
         self.bmp_var = tk.StringVar()
         ttk.Entry(self._bmp_frame, textvariable=self.bmp_var).grid(
@@ -67,7 +86,7 @@ class PageCapture:
                         variable=self.convert_var).grid(
             row=1, column=0, columnspan=3, sticky=tk.W, padx=4)
 
-        # ── 选项（BMP 框插入到此框之前） ──
+        # ── 输出选项 ──
         self._options_frame = ttk.LabelFrame(scroll, text="输出选项", padding=8)
         self._options_frame.pack(fill=tk.X, padx=5, pady=3)
         self.out_var = tk.StringVar(value="newfile")
@@ -78,8 +97,16 @@ class PageCapture:
                         variable=self.out_var, value="inplace").grid(
             row=1, column=0, columnspan=2, sticky=tk.W, padx=4)
 
-        # 默认 nop 模式：BMP 框隐藏（模式变化时切换显示）
+        # mode 两个 frame 都先 pack 到输出选项上方（nop 在 bmp 之上），
+        # 再由 _on_mode_changed 按模式切换显示
+        self._bmp_frame.pack(fill=tk.X, padx=5, pady=3,
+                             before=self._options_frame)
+        self._nop_frame.pack(fill=tk.X, padx=5, pady=3,
+                             before=self._options_frame)
+
+        # 默认 nop 模式
         self.mode_var.trace_add("write", self._on_mode_changed)
+        self._on_mode_changed()
 
         # ── 按钮 ──
         bar = ttk.Frame(scroll)
@@ -102,6 +129,22 @@ class PageCapture:
         return frame
 
     # ------------------------------------------------------------
+    def _build_nop_checkboxes(self, parent):
+        """从配置读取所有 NOP 点，构建复选框（默认勾选 pipeline）。"""
+        for ft in self._target.files:
+            for p in ft.patch_points:
+                if p.shellcode_mode:
+                    continue
+                var = tk.BooleanVar(value=(p.label == "pipeline"))
+                desc = _NOP_DESC.get(p.label, p.label)
+                cb = ttk.Checkbutton(parent, text=p.label + " — " + desc,
+                                     variable=var)
+                cb.pack(anchor=tk.W, padx=4, pady=2)
+                self._nop_vars[p.label] = var
+
+    def _selected_nop_labels(self):
+        return [lbl for lbl, var in self._nop_vars.items() if var.get()]
+
     def _autofill(self):
         if not self.dll_var.get().strip():
             p = resolve_target("StudentLogic.dll")
@@ -109,11 +152,19 @@ class PageCapture:
                 self.dll_var.set(p)
 
     def _on_mode_changed(self, *args):
-        if self.mode_var.get() == "fake":
-            self._bmp_frame.pack(fill=tk.X, padx=5, pady=3,
-                                 before=self._options_frame)
+        fake = (self.mode_var.get() == "fake")
+        if fake:
+            if self._bmp_frame.winfo_manager() != "pack":
+                self._bmp_frame.pack(fill=tk.X, padx=5, pady=3,
+                                     before=self._options_frame)
+            if self._nop_frame.winfo_manager() == "pack":
+                self._nop_frame.pack_forget()
         else:
-            self._bmp_frame.pack_forget()
+            if self._nop_frame.winfo_manager() != "pack":
+                self._nop_frame.pack(fill=tk.X, padx=5, pady=3,
+                                     before=self._options_frame)
+            if self._bmp_frame.winfo_manager() == "pack":
+                self._bmp_frame.pack_forget()
 
     def _browse_dll(self):
         p = filedialog.askopenfilename(
@@ -139,17 +190,62 @@ class PageCapture:
             return None
         return p
 
+    def _executor(self, dll):
+        return VAPatchExecutor(self._target, dll)
+
+    def _resolve_bmp(self):
+        """fake 模式：校验 BMP + 可选转换。返回 (bmp_path, ok)。"""
+        bmp = self.bmp_var.get().strip()
+        if not bmp:
+            messagebox.showwarning("缺少 BMP", "假截图模式需指定 BMP 文件。")
+            return None, False
+        if len(bmp) > self._target.shellcode_max_fp:
+            messagebox.showerror(
+                "路径过长",
+                "BMP 路径 %d 字符 > %d，请改用短路径（如 C:\\os_fake.bmp）。"
+                % (len(bmp), self._target.shellcode_max_fp))
+            return None, False
+        if not os.path.isfile(bmp):
+            messagebox.showerror("文件不存在", bmp)
+            return None, False
+        try:
+            hdr = validate_bmp(bmp)
+        except Exception as e:
+            messagebox.showerror("BMP 校验失败", str(e))
+            return None, False
+        self.ui.show_status(
+            "BMP %dx%d %dbpp" % (hdr["bi_width"], hdr["abs_height"],
+                                 hdr["bi_bitcount"]))
+        if hdr["is_bottom_up"] and self.convert_var.get():
+            bmp = convert_bmp_topdown(bmp)
+        elif hdr["is_bottom_up"]:
+            messagebox.showwarning(
+                "BMP 方向",
+                "BMP 是 bottom-up！请勾选自动转换，或手动转换为 top-down。")
+        return bmp, True
+
+    # ------------------------------------------------------------
     def _do_preview(self):
         dll = self._dll()
         if not dll:
             return
-        fake = self.bmp_var.get().strip() if self.mode_var.get() == "fake" else None
-        inplace = self.out_var.get() == "inplace"
-        convert = self.convert_var.get()
+        ex = self._executor(dll)
 
-        def func():
-            sc.process_one(dll, sc.DEFAULT_TARGETS, dry_run=True, inplace=inplace,
-                           strict=True, fake_screen=fake, convert_bmp=convert)
+        if self.mode_var.get() == "fake":
+            bmp, ok = self._resolve_bmp()
+            if not ok:
+                return
+
+            def func():
+                ex.dry_run(labels=["fake_screen"])
+        else:
+            labels = self._selected_nop_labels()
+            if not labels:
+                messagebox.showwarning("未选点", "请至少勾选一个 NOP 点。")
+                return
+
+            def func():
+                ex.dry_run(labels=labels)
 
         self._run(func, "预览完成（未写盘）", "预览出错，查看日志")
 
@@ -157,22 +253,27 @@ class PageCapture:
         dll = self._dll()
         if not dll:
             return
-        fake = self.bmp_var.get().strip() if self.mode_var.get() == "fake" else None
-        if self.mode_var.get() == "fake" and not fake:
-            messagebox.showwarning("缺少 BMP", "假截图模式需指定 BMP 文件。")
-            return
-        if self.mode_var.get() == "fake" and len(fake) > sc.SC_MAX_FP:
-            messagebox.showerror("路径过长",
-                                 f"BMP 路径 {len(fake)} 字符 > {sc.SC_MAX_FP}，请改用短路径（如 C:\\os_fake.bmp）。")
-            return
+        ex = self._executor(dll)
         inplace = self.out_var.get() == "inplace"
-        convert = self.convert_var.get()
-        if inplace and not self.ui.confirm("将直接修改原文件（自动生成 .bak 备份）。\n确定继续？"):
+        if inplace and not self.ui.confirm(
+                "将直接修改原文件（自动生成 .bak 备份）。\n确定继续？"):
             return
 
-        def func():
-            sc.process_one(dll, sc.DEFAULT_TARGETS, dry_run=False, inplace=inplace,
-                           strict=True, fake_screen=fake, convert_bmp=convert)
+        if self.mode_var.get() == "fake":
+            bmp, ok = self._resolve_bmp()
+            if not ok:
+                return
+
+            def func():
+                ex.patch(inplace=inplace, labels=["fake_screen"], fake_screen=bmp)
+        else:
+            labels = self._selected_nop_labels()
+            if not labels:
+                messagebox.showwarning("未选点", "请至少勾选一个 NOP 点。")
+                return
+
+            def func():
+                ex.patch(inplace=inplace, labels=labels)
 
         self._run(func, "Patch 完成", "应用失败，查看日志")
 
@@ -180,9 +281,10 @@ class PageCapture:
         dll = self._dll()
         if not dll:
             return
+        ex = self._executor(dll)
 
         def func():
-            sc.restore_one(dll)
+            ex.restore()
 
         self._run(func, "已还原", "还原失败，查看日志")
 

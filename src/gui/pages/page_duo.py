@@ -1,20 +1,19 @@
 # src/gui/pages/page_duo.py
 # 双开页（页面 2）—— 双开教师端 / 学生端
 #
-# 驱动 src/modules/duo_open.py：
-#   process_one(path, role, ns)  role ∈ {teacher, student}
-#   restore_one(path, ns)
-#   ns = SimpleNamespace(dry_run, inplace, strict)
+# 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/duo_open 配置。
+# duo_open 目标含两个文件（Teacher.exe / Student.exe），各建一个执行器。
 #
-# 输出经 ui.run_with_log 捕获（module 内部用 print）。
+# 输出经 ui.run_with_log 捕获（执行器默认 log=print）。
 
 import os
-import types
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 from src.gui.widgets import make_scrollable, make_output_text, clear_text
 from src.core import resolve_target
+from src.core.va_patch import VAPatchExecutor
+from src.modules.patches import get_va_target
 
 
 class PageDuo:
@@ -117,15 +116,16 @@ class PageDuo:
                 return None
         return t, s
 
-    def _ns(self, dry=False):
-        return types.SimpleNamespace(
-            dry_run=dry,
-            inplace=(self.mode.get() == "inplace"),
-            strict=self.strict.get(),
-        )
+    def _executors(self):
+        """对 Teacher / Student 各建一个执行器。返回 (tea_ex, stu_ex)。"""
+        target = get_va_target("duo_open")
+        t, s = self._paths() or (None, None)
+        if not t or not s:
+            return None, None
+        return (VAPatchExecutor(target, t, role="teacher"),
+                VAPatchExecutor(target, s, role="student"))
 
     def _run(self, func, ok_msg, fail_msg):
-        from src.modules import duo_open
         clear_text(self._log)
         self.ui.run_with_log(func, self._log,
                              on_done=lambda ok: self.ui.show_status(
@@ -133,47 +133,39 @@ class PageDuo:
                              label="duo_open")
 
     def _do_preview(self):
-        ps = self._paths()
-        if not ps:
+        if not self._paths():
             return
-        t, s = ps
+        tea, stu = self._executors()
 
         def func():
-            from src.modules import duo_open
-            ns = self._ns(dry=True)
-            duo_open.process_one(t, "teacher", ns)
-            duo_open.process_one(s, "student", ns)
+            tea.dry_run(strict=self.strict.get())
+            stu.dry_run(strict=self.strict.get())
 
         self._run(func, "预览完成（未写盘）", "预览出错，查看日志")
 
     def _do_build(self):
-        ps = self._paths()
-        if not ps:
+        if not self._paths():
             return
-        t, s = ps
-        if self.mode.get() == "inplace" and not self.ui.confirm(
+        tea, stu = self._executors()
+        inplace = (self.mode.get() == "inplace")
+        if inplace and not self.ui.confirm(
                 "将直接修改原文件（自动生成 .duo_open.bak 备份）。\n确定继续？"):
             return
 
         def func():
-            from src.modules import duo_open
-            ns = self._ns(dry=False)
-            duo_open.process_one(t, "teacher", ns)
-            duo_open.process_one(s, "student", ns)
+            tea.patch(inplace=inplace, strict=self.strict.get())
+            stu.patch(inplace=inplace, strict=self.strict.get())
 
         self._run(func, "双开版生成完成", "生成失败，查看日志")
 
     def _do_restore(self):
-        ps = self._paths()
-        if not ps:
+        if not self._paths():
             return
-        t, s = ps
+        tea, stu = self._executors()
 
         def func():
-            from src.modules import duo_open
-            ns = self._ns()
-            duo_open.restore_one(t, ns)
-            duo_open.restore_one(s, ns)
+            tea.restore()
+            stu.restore()
 
         self._run(func, "还原完成", "还原失败，查看日志")
 

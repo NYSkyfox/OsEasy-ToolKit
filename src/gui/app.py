@@ -177,9 +177,17 @@ class Ui:
     def confirm(self, msg: str) -> bool:
         """线程安全的阻塞式确认对话框。
 
-        从任意线程调用：把请求入队，由主线程 _pump_confirm 弹出 messagebox，
-        后台线程阻塞等待结果。
+        - 主线程调用（按钮回调等）：直接同步弹 messagebox。
+          若此时也走“入队 + ev.wait”，主循环会因阻塞停转，
+          导致 _pump_confirm（after 回调）永不触发 → 死锁，整窗卡死 120s。
+        - 后台线程调用：把请求入队，由主线程 _pump_confirm 弹出 messagebox，
+          后台线程阻塞等待结果（主循环持续运行，不卡 UI）。
         """
+        if threading.current_thread() is threading.main_thread():
+            try:
+                return messagebox.askyesno("确认", msg)
+            except Exception:
+                return False
         result = []
         ev = threading.Event()
         self._confirm_q.put((msg, result, ev))
