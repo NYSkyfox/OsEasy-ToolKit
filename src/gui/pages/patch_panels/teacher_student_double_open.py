@@ -1,9 +1,8 @@
-# src/gui/pages/patch_panels/duo_panel.py
-# 双开教师端 / 学生端 详情面板（VA 型）
-#
+# src/gui/pages/patch_panels/teacher_student_double_open.py
+# 「双开教师端 / 学生端」面板 —— VA 型 patch
 # 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/duo_open 配置。
 # 配置含两个文件（Teacher.exe / Student.exe），各建一个执行器。
-# 面板契约：__init__(ui, detail, log_text) —— 把控件 build 进 detail，日志写入 log_text。
+# 面板契约：__init__(ui, detail, log_text)，build 进 detail，日志写 log_text。
 
 import os
 import tkinter as tk
@@ -15,13 +14,15 @@ from src.core.va_patch import VAPatchExecutor
 from src.modules.patches import get_va_target
 
 
-class DuoPanel:
+class TeacherStudentDoubleOpen:
+
+    VA_KEY = "duo_open"
 
     def __init__(self, ui, detail, log_text):
         self.ui = ui
         self._detail = detail
         self._log = log_text
-        self._target = get_va_target("duo_open")
+        self._target = get_va_target(self.VA_KEY)
         self._build()
 
     # ------------------------------------------------------------

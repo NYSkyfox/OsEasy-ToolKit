@@ -106,8 +106,6 @@ class PageOverview:
         self._module_rows = {}
         row = 0
         for key, (name, desc) in FEATURE_DESC.items():
-            if key in ("multiclient_disable", "screenrender_windowed"):
-                continue  # 这两个在 Patch 状态区已展示
             ttk.Label(box, text=name, width=14, anchor=tk.W,
                       font=("", 9, "bold")).grid(row=row, column=0,
                                                  sticky=tk.NW, pady=4)
@@ -128,12 +126,12 @@ class PageOverview:
         ttk.Button(bar, text="刷新状态", command=self._refresh).pack(
             side=tk.LEFT, padx=(0, 6))
 
-        # 全部 patch 目标现统一在 Patch 页，快捷入口跳转并选中具体目标
+        # 全部 patch 目标现统一在 Patch 页，快捷入口跳转并选中具体目标（key=面板 id）
         navs = [
             ("全部 Patch", None),
-            ("双开", "va:duo_open"),
-            ("截屏", "va:screen_capture"),
-            ("拦截关机", "va:noshutdown"),
+            ("双开", "teacher_student_double_open"),
+            ("截屏", "student_fake_screenshot"),
+            ("拦截关机", "fake_shutdown"),
         ]
         for text, key in navs:
             ttk.Button(bar, text=text,

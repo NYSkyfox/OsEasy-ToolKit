@@ -76,9 +76,9 @@ class PagePatches:
             self._on_select()
 
     def select_key(self, key: str):
-        """按 key（如 'va:duo_open' / 'fixed:multiclient_disable'）选中。"""
+        """按 id（= 面板文件名，如 'fake_shutdown'）选中。"""
         for i, e in enumerate(REGISTRY):
-            if e["key"] == key:
+            if e["id"] == key:
                 self._combo.current(i)
                 self._on_select()
                 return

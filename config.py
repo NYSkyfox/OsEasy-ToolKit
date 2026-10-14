@@ -28,17 +28,10 @@ OSEASY_INSTALL_CANDIDATES = [
 ACCENT_COLOR = "#3B8A67"
 
 # ── 各功能的人类可读描述（用于 GUI 概览 / tooltip） ────────
+# 说明：3 个 VA 型功能在此登记（overview「功能模块」区显示）。
+# 3 个固定偏移目标（行为管控 / 屏幕广播 / 窗口化）由 overview「Patch 目标状态」
+# 区直接遍历 src/patches 注册表展示，不在此重复。
 FEATURE_DESC = {
-    "multiclient_disable": (
-        "禁用教学管控",
-        "patch MultiClient.exe，使教师端下发的 键鼠锁 / 行为管控（网络·USB·程序）"
-        "指令在学生机失效。屏幕广播默认保留，可用 --no-screen 一并禁用。",
-    ),
-    "screenrender_windowed": (
-        "屏幕广播窗口化",
-        "patch ScreenRender.exe，强制 --fullscreen=0，使教师端屏幕广播始终以"
-        "可拖拽/可缩放的窗口启动，而非默认全屏。广播功能保留。",
-    ),
     "duo_open": (
         "双开教师端 / 学生端",
         "patch Teacher.exe / Student.exe 的互斥检测原语（OpenEventW 恒返回 0），"

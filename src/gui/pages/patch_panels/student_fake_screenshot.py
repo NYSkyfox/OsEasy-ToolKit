@@ -1,12 +1,11 @@
-# src/gui/pages/patch_panels/capture_panel.py
-# 阻止 / 使用假屏幕截图 详情面板（VA 型）
-#
+# src/gui/pages/patch_panels/student_fake_screenshot.py
+# 「阻止 / 使用假屏幕截图」面板 —— VA 型 patch
 # 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/screen_capture 配置。
 # 配置含 5 个点：4 个 NOP 点（pipeline/bplt/screenrender/wsasend）+ 1 个假截图 shellcode 点。
 # 两种工作模式（对应 GUI 单选）：
 #   nop   —— 勾选要 patch 的 NOP 点（默认 pipeline），传入 labels
 #   fake  —— 用本地 BMP 替换 BitBlt（传 labels=["fake_screen"] + fake_screen=BMP 路径）
-# 面板契约：__init__(ui, detail, log_text) —— 把控件 build 进 detail，日志写入 log_text。
+# 面板契约：__init__(ui, detail, log_text)，build 进 detail，日志写 log_text。
 
 import os
 import tkinter as tk
@@ -26,13 +25,15 @@ _NOP_DESC = {
 }
 
 
-class CapturePanel:
+class StudentFakeScreenshot:
+
+    VA_KEY = "screen_capture"
 
     def __init__(self, ui, detail, log_text):
         self.ui = ui
         self._detail = detail
         self._log = log_text
-        self._target = get_va_target("screen_capture")
+        self._target = get_va_target(self.VA_KEY)
         self._nop_vars = {}     # label -> BooleanVar
         self._build()
 

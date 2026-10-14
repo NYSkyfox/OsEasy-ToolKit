@@ -1,10 +1,9 @@
-# src/gui/pages/patch_panels/noshutdown_panel.py
-# 拦截远程关机 / 重启 详情面板（VA 型）
-#
+# src/gui/pages/patch_panels/fake_shutdown.py
+# 「拦截远程关机 / 重启」面板 —— VA 型 patch
 # 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/noshutdown 配置。
 #   文件版  —— executor.dry_run / patch / restore
 #   内存版  —— executor.mem_status / mem_patch / mem_restore（仅 Windows + 管理员）
-# 面板契约：__init__(ui, detail, log_text) —— 把控件 build 进 detail，日志写入 log_text。
+# 面板契约：__init__(ui, detail, log_text)，build 进 detail，日志写 log_text。
 
 import os
 import tkinter as tk
@@ -16,13 +15,15 @@ from src.core.va_patch import VAPatchExecutor, _is_windows
 from src.modules.patches import get_va_target
 
 
-class NoshutdownPanel:
+class FakeShutdown:
+
+    VA_KEY = "noshutdown"
 
     def __init__(self, ui, detail, log_text):
         self.ui = ui
         self._detail = detail
         self._log = log_text
-        self._target = get_va_target("noshutdown")
+        self._target = get_va_target(self.VA_KEY)
         self._build()
 
     # ------------------------------------------------------------

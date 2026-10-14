@@ -4,7 +4,7 @@
 # pack/grid"在目标 Python 版本无运行时错误。build 成功后立即 destroy。
 #
 # 本次额外：遍历统一 Patch 页的 REGISTRY，逐个切换目标并 build 各面板，
-# 确保 5 个 patch 目标（2 固定偏移 + 3 VA）的面板均可无错构建。
+# 确保 6 个 patch 目标（3 固定偏移 + 3 VA）的面板均可无错构建。
 import os
 import sys
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -57,9 +57,9 @@ for i, entry in enumerate(REGISTRY):
     pp.select_index(i)
     ui.root.update_idletasks()
     ui.root.update()
-    assert pp._panel is not None, f"panel not built for {entry['key']}"
-    assert pp._panel.buttons(), f"no buttons for {entry['key']}"
-    print(f"panel OK  [{i}] {entry['kind']:>5}  {entry['key']}  "
+    assert pp._panel is not None, f"panel not built for {entry['id']}"
+    assert pp._panel.buttons(), f"no buttons for {entry['id']}"
+    print(f"panel OK  [{i}] {entry['kind']:>5}  {entry['id']}  "
           f"buttons={len(pp._panel.buttons())}")
 
 disable_widget_focus(ui.root)

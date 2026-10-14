@@ -9,7 +9,8 @@
 
 | 模块 | 类型 | 作用 |
 |---|---|---|
-| **禁用教学管控** | 固定偏移 patch | patch `MultiClient.exe`，使教师端下发的 键鼠锁 / 行为管控（网络·USB·程序）指令失效；屏幕广播点可选 |
+| **禁用行为管控** | 固定偏移 patch | patch `MultiClient.exe` 行为管控（网络·USB·程序）入口，指令在学生机失效 |
+| **禁用屏幕广播** | 固定偏移 patch | patch `MultiClient.exe` 屏幕广播入口（画面不再被截取）；**可勾选一并封禁键鼠锁** |
 | **屏幕广播窗口化** | 固定偏移 patch | patch `ScreenRender.exe`，强制 `--fullscreen=0`，广播始终以可拖拽/可缩放窗口启动（广播保留） |
 | **双开教师端 / 学生端** | PE+VA patch | patch `Teacher.exe` / `Student.exe` 的互斥检测原语（OpenEventW 恒返回 0），实现两端同时运行 |
 | **阻止 / 使用假屏幕截图** | PE+VA+shellcode | patch `StudentLogic.dll`：NOP 停止截屏发送，或用本地 BMP 替换 BitBlt（教师端显示固定假画面） |
@@ -21,7 +22,7 @@
 python main.py
 ```
 
-GUI：`tkinter + ttk`（vista 主题），顶部导航栏 + 下部内容区，两个页面：主页 / Patch（统一 Patch 页含全部 5 个 patch 目标，按目标切换详情面板）。
+GUI：`tkinter + ttk`（vista 主题），顶部导航栏 + 下部内容区，两个页面：主页 / Patch（统一 Patch 页含全部 6 个 patch 目标，按目标切换详情面板）。
 
 ## 项目结构（解耦式）
 
@@ -41,8 +42,9 @@ OsEasy-ManagerHelper/
 │   │   └── va_patch.py      #     VA 型统一执行器（PE 解析 / shellcode / 内存版 / BMP）
 │   │
 │   ├── patches/             # ── 固定偏移 patch（注册表驱动，引擎型） ──
-│   │   ├── multiclient_disable.py    # 禁用教学管控
-│   │   └── screenrender_windowed.py  # 屏幕广播窗口化
+│   │   ├── multiclient_disable_behaviorcontrol.py  # 禁用行为管控
+│   │   ├── multiclient_disable_screenrender.py     # 禁用屏幕广播（含可选键鼠锁）
+│   │   └── screenrender_windowed.py                # 屏幕广播窗口化
 │   │
 │   ├── modules/             # ── VA 型 patch：纯配置（无执行逻辑） ──
 │   │   └── patches/           #   每个文件一个 VA_PatchTarget（patch 点数据）
@@ -57,11 +59,13 @@ OsEasy-ManagerHelper/
 │       └── pages/
 │           ├── page_overview.py   # 主页（环境 + 状态 + 快捷入口）
 │           ├── page_patches.py    # 统一 Patch 页（目标下拉 + 动态面板 + 共享日志）
-│           └── patch_panels/      #   各目标详情面板（纯展示 + 调执行器）
-│               ├── fixed_panel.py       # 固定偏移型（PatchEngine）
-│               ├── duo_panel.py         # VA 双开
-│               ├── capture_panel.py     # VA 截屏（nop/fake）
-│               └── noshutdown_panel.py  # VA 拦截关机（file/mem）
+│           └── patch_panels/      #   一个下拉项 = 一个面板文件（纯展示 + 调执行器）
+│               ├── multiclient_disable_behaviorcontrol.py
+│               ├── multiclient_disable_screenrender.py
+│               ├── screenrender_windowed.py
+│               ├── teacher_student_double_open.py
+│               ├── student_fake_screenshot.py
+│               └── fake_shutdown.py
 │
 ├── tests/                   # （预留）
 └── docs/patches/            # 逆向 patch 点文档
@@ -74,7 +78,7 @@ OsEasy-ManagerHelper/
   - `va_patch`（VA 型统一执行器）：`VAPatchExecutor`，含 PE 解析 / VA→偏移 / shellcode 生成 / 内存版 / BMP 处理，是**唯一**执行 VA 型 patch 的入口。
 - **patches**：固定偏移 patch 目标（引擎型），每个文件定义一个 `PatchTarget` 并注册到 `__init__.ALL_TARGETS`；新增工具 = 加一个文件 + 一行注册，GUI 自动发现。
 - **modules/patches**：VA 型 patch 的**纯配置**（每个文件一个 `VA_PatchTarget`，仅 patch 点数据，无执行逻辑），由 `va_patch.VAPatchExecutor` 读取后执行；新增工具 = 加一个配置 + 一行注册。
-- **gui**：只负责展示与交互，调用 core 执行器 + 读取 patches/modules 配置，不含业务逻辑。所有 patch 目标统一在 **Patch 页**（目标下拉 → 动态重建详情面板 → 共享日志），每个目标的面板在 `patch_panels/` 独立成文件；新增目标只需在对应注册表登记，下拉框自动出现。
+- **gui**：只负责展示与交互，调用 core 执行器 + 读取 patches/modules 配置，不含业务逻辑。所有 patch 目标统一在 **Patch 页**（目标下拉 → 动态重建详情面板 → 共享日志），**一个下拉项 = 一个面板文件**（`patch_panels/<id>.py`，类名 = id 的 PascalCase）；新增目标 = 建一个面板文件 + 在 `patch_panels/__init__.REGISTRY` 登记一条，下拉框自动出现。
 
 ## 安全说明
 

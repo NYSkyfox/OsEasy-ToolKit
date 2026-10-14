@@ -1,24 +1,26 @@
-# src/gui/pages/patch_panels/fixed_panel.py
-# 固定偏移型 patch 详情面板（PatchEngine 驱动）
-#
-# 一个实例对应一个固定偏移目标（禁用管控 / 屏幕窗口化）。
-# 面板契约：__init__(ui, detail, log_text) —— 把控件 build 进 detail，日志写入 log_text。
+# src/gui/pages/patch_panels/screenrender_windowed.py
+# 「屏幕广播窗口化」面板 —— 固定偏移 patch（PatchEngine 驱动）
+# 目标：src/patches/screenrender_windowed（ScreenRender.exe fullscreen 赋值点）
+# 面板契约：__init__(ui, detail, log_text)，build 进 detail，日志写 log_text。
 
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from src.core import PatchEngine, resolve_target
+from src.core import PatchEngine, resolve_target, ST_DONE, ST_BAD
+from src.patches import get_target
 from src.gui.widgets import append_text, clear_text
 
 
-class FixedPanel:
+class ScreenrenderWindowed:
 
-    def __init__(self, ui, detail, log_text, target):
+    TARGET_KEY = "screenrender_windowed"
+
+    def __init__(self, ui, detail, log_text):
         self.ui = ui
         self._detail = detail
         self._log = log_text
-        self._target = target
+        self._target = get_target(self.TARGET_KEY)
         self._toggles = []          # [(toggle_key, var)]
         self._build()
 
@@ -26,13 +28,11 @@ class FixedPanel:
     def _build(self):
         t = self._target
         d = self._detail
-
-        # ── 描述 ──
         ttk.Label(d, text=t.description, anchor=tk.W, foreground="gray",
                   wraplength=660, justify=tk.LEFT).pack(fill=tk.X, padx=2, pady=(0, 4))
 
-        # ── 路径 ──
-        pf = ttk.LabelFrame(d, text="目标文件路径", padding=8)
+        # 路径
+        pf = ttk.LabelFrame(d, text="目标文件路径 (ScreenRender.exe)", padding=8)
         pf.pack(fill=tk.X, padx=2, pady=3)
         pf.columnconfigure(1, weight=1)
         self._path_var = tk.StringVar(value="")
@@ -44,21 +44,23 @@ class FixedPanel:
                   font=("", 8)).grid(row=1, column=0, columnspan=3,
                                      sticky=tk.W, pady=(2, 0))
 
-        # ── 可选开关 ──
-        self._toggle_frame = ttk.LabelFrame(d, text="选项", padding=8)
+        # 可勾选选项（toggle_key 点，默认启用）；本目标无可选项则隐藏该框
+        self._toggle_frame = ttk.LabelFrame(d, text="可勾选项", padding=8)
         self._toggle_frame.pack(fill=tk.X, padx=2, pady=3)
         for p in t.patches:
             if not p.toggle_key:
                 continue
-            var = tk.BooleanVar(value=True)   # 默认启用
+            var = tk.BooleanVar(value=True)
             ttk.Checkbutton(self._toggle_frame, text=f"同时 patch：{p.label}",
                             variable=var).pack(anchor=tk.W, padx=4, pady=2)
             self._toggles.append((p.toggle_key, var))
+        if not self._toggles:
+            self._toggle_frame.pack_forget()
 
         self._refresh()
 
     # ------------------------------------------------------------
-    def _current_skips(self):
+    def _skips(self):
         return [k for k, var in self._toggles if not var.get()]
 
     def _resolved_path(self):
@@ -79,13 +81,13 @@ class FixedPanel:
 
     def _browse(self):
         p = filedialog.askopenfilename(
-            title=f"选择 {self._target.sample_name}",
-            filetypes=[("可执行文件", "*.exe"), ("DLL", "*.dll"), ("所有文件", "*.*")])
+            title="选择 ScreenRender.exe",
+            filetypes=[("可执行文件", "*.exe"), ("所有文件", "*.*")])
         if p:
             self._path_var.set(p)
             self._refresh()
 
-    def _make_engine(self):
+    def _engine(self):
         path = self._resolved_path()
         if not path:
             return None
@@ -102,22 +104,20 @@ class FixedPanel:
 
     # ------------------------------------------------------------
     def _do_preview(self):
-        eng = self._make_engine()
+        eng = self._engine()
         if eng is None:
             return
-        skips = self._current_skips()
         clear_text(self._log)
-        self.ui.run_in_thread(lambda: eng.dry_run(toggles=skips))
+        self.ui.run_in_thread(lambda: eng.dry_run(toggles=self._skips()))
 
     def _do_apply(self):
-        eng = self._make_engine()
+        eng = self._engine()
         if eng is None:
             return
-        skips = self._current_skips()
         clear_text(self._log)
 
         def work():
-            return eng.apply(toggles=skips, confirm=self._confirm)
+            return eng.apply(toggles=self._skips(), confirm=self._confirm)
 
         def done(result, ok):
             if ok and result:
@@ -129,7 +129,7 @@ class FixedPanel:
         self.ui.run_in_thread(work, on_done=done, label="patch")
 
     def _do_restore(self):
-        eng = self._make_engine()
+        eng = self._engine()
         if eng is None:
             return
         clear_text(self._log)
@@ -146,16 +146,15 @@ class FixedPanel:
 
         self.ui.run_in_thread(work, on_done=done, label="restore")
 
-    # ------------------------------------------------------------
     def _refresh(self):
-        eng = self._make_engine()
+        eng = self._engine()
         if eng is None:
             return
-        st = eng.status(toggles=self._current_skips())
-        from src.core import ST_DONE, ST_BAD
+        st = eng.status(toggles=self._skips())
         if not st.get("exists"):
             clear_text(self._log)
-            append_text(self._log, f"文件不存在：{self._target.sample_name}", self.ui.root)
+            append_text(self._log, f"文件不存在：{self._target.sample_name}",
+                        self.ui.root)
             return
         lines = [
             f"── {self._target.name} 状态 ──",
@@ -173,7 +172,6 @@ class FixedPanel:
 
     # ------------------------------------------------------------
     def buttons(self):
-        """返回按钮 [(text, command)]，由宿主页面统一排布。"""
         return [
             ("预览 (Dry-run)", self._do_preview),
             ("应用 Patch", self._do_apply),
