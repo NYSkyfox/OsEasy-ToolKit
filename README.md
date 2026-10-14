@@ -21,7 +21,7 @@
 python main.py
 ```
 
-GUI：`tkinter + ttk`（vista 主题），顶部导航栏 + 下部内容区，四个页面：主页 / Patch / 双开 / 截屏。
+GUI：`tkinter + ttk`（vista 主题），顶部导航栏 + 下部内容区，两个页面：主页 / Patch（统一 Patch 页含全部 5 个 patch 目标，按目标切换详情面板）。
 
 ## 项目结构（解耦式）
 
@@ -56,10 +56,12 @@ OsEasy-ManagerHelper/
 │       ├── widgets.py       #     通用控件（滚动容器 / 日志框）
 │       └── pages/
 │           ├── page_overview.py   # 主页（环境 + 状态 + 快捷入口）
-│           ├── page_patches.py    # Patch 管理
-│           ├── page_duo.py        # 双开
-│           ├── page_capture.py    # 截屏
-│           └── page_noshutdown.py # 拦截远程关机/重启
+│           ├── page_patches.py    # 统一 Patch 页（目标下拉 + 动态面板 + 共享日志）
+│           └── patch_panels/      #   各目标详情面板（纯展示 + 调执行器）
+│               ├── fixed_panel.py       # 固定偏移型（PatchEngine）
+│               ├── duo_panel.py         # VA 双开
+│               ├── capture_panel.py     # VA 截屏（nop/fake）
+│               └── noshutdown_panel.py  # VA 拦截关机（file/mem）
 │
 ├── tests/                   # （预留）
 └── docs/patches/            # 逆向 patch 点文档
@@ -72,7 +74,7 @@ OsEasy-ManagerHelper/
   - `va_patch`（VA 型统一执行器）：`VAPatchExecutor`，含 PE 解析 / VA→偏移 / shellcode 生成 / 内存版 / BMP 处理，是**唯一**执行 VA 型 patch 的入口。
 - **patches**：固定偏移 patch 目标（引擎型），每个文件定义一个 `PatchTarget` 并注册到 `__init__.ALL_TARGETS`；新增工具 = 加一个文件 + 一行注册，GUI 自动发现。
 - **modules/patches**：VA 型 patch 的**纯配置**（每个文件一个 `VA_PatchTarget`，仅 patch 点数据，无执行逻辑），由 `va_patch.VAPatchExecutor` 读取后执行；新增工具 = 加一个配置 + 一行注册。
-- **gui**：只负责展示与交互，调用 core 执行器 + 读取 patches/modules 配置，不含业务逻辑。
+- **gui**：只负责展示与交互，调用 core 执行器 + 读取 patches/modules 配置，不含业务逻辑。所有 patch 目标统一在 **Patch 页**（目标下拉 → 动态重建详情面板 → 共享日志），每个目标的面板在 `patch_panels/` 独立成文件；新增目标只需在对应注册表登记，下拉框自动出现。
 
 ## 安全说明
 

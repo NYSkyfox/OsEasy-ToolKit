@@ -1,38 +1,37 @@
-# src/gui/pages/page_noshutdown.py
-# 拦截远程关机 / 重启页（页面 4）
+# src/gui/pages/patch_panels/noshutdown_panel.py
+# 拦截远程关机 / 重启 详情面板（VA 型）
 #
 # 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/noshutdown 配置。
 #   文件版  —— executor.dry_run / patch / restore
 #   内存版  —— executor.mem_status / mem_patch / mem_restore（仅 Windows + 管理员）
-#
-# 输出经 ui.run_with_log 捕获（执行器默认 log=print）。
+# 面板契约：__init__(ui, detail, log_text) —— 把控件 build 进 detail，日志写入 log_text。
 
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from src.gui.widgets import make_scrollable, make_output_text, clear_text
+from src.gui.widgets import clear_text
 from src.core import resolve_target
 from src.core.va_patch import VAPatchExecutor, _is_windows
 from src.modules.patches import get_va_target
 
 
-class PageNoshutdown:
+class NoshutdownPanel:
 
-    def __init__(self, ui):
+    def __init__(self, ui, detail, log_text):
         self.ui = ui
-        self._after_id = None
+        self._detail = detail
+        self._log = log_text
         self._target = get_va_target("noshutdown")
+        self._build()
 
-    def build(self):
-        ui = self.ui
-        frame = ttk.Frame(ui.notebook)
-        self._frame = frame
-        _, scroll = make_scrollable(frame)
+    # ------------------------------------------------------------
+    def _build(self):
+        d = self._detail
 
         # ── 文件选择 ──
-        ff = ttk.LabelFrame(scroll, text="目标文件 (Student.exe)", padding=8)
-        ff.pack(fill=tk.X, padx=5, pady=3)
+        ff = ttk.LabelFrame(d, text="目标文件 (Student.exe)", padding=8)
+        ff.pack(fill=tk.X, padx=2, pady=3)
         ff.columnconfigure(1, weight=1)
         self.var_path = tk.StringVar()
         ttk.Label(ff, text="路径", anchor=tk.W).grid(row=0, column=0,
@@ -43,8 +42,8 @@ class PageNoshutdown:
             row=0, column=2, padx=6)
 
         # ── 运行方式 ──
-        mf = ttk.LabelFrame(scroll, text="运行方式", padding=8)
-        mf.pack(fill=tk.X, padx=5, pady=3)
+        mf = ttk.LabelFrame(d, text="运行方式", padding=8)
+        mf.pack(fill=tk.X, padx=2, pady=3)
         mf.columnconfigure(1, weight=1)
         self.mode = tk.StringVar(value="file")
         ttk.Radiobutton(mf, text="文件版 —— 改磁盘上的 Student.exe（持久，需先结束学生端再启动）",
@@ -55,8 +54,8 @@ class PageNoshutdown:
             row=1, column=0, columnspan=2, sticky=tk.W, padx=4)
 
         # ── 文件版子选项 ──
-        of = ttk.LabelFrame(scroll, text="文件版写入方式", padding=8)
-        of.pack(fill=tk.X, padx=5, pady=3)
+        of = ttk.LabelFrame(d, text="文件版写入方式", padding=8)
+        of.pack(fill=tk.X, padx=2, pady=3)
         of.columnconfigure(1, weight=1)
         self.fmode = tk.StringVar(value="newfile")
         ttk.Radiobutton(of, text="生成新文件  *.noshutdown.exe（推荐，不动原文件）",
@@ -66,27 +65,8 @@ class PageNoshutdown:
                         variable=self.fmode, value="inplace").grid(
             row=1, column=0, columnspan=2, sticky=tk.W, padx=4)
 
-        # ── 按钮 ──
-        bar = ttk.Frame(scroll)
-        bar.pack(fill=tk.X, padx=5, pady=4)
-        ttk.Button(bar, text="预览 / 状态", command=self._do_preview).pack(
-            side=tk.LEFT, padx=(0, 6))
-        ttk.Button(bar, text="执行拦截", command=self._do_build).pack(
-            side=tk.LEFT, padx=6)
-        ttk.Button(bar, text="还原", command=self._do_restore).pack(
-            side=tk.LEFT, padx=6)
-        ttk.Button(bar, text="打开目录", command=self._open_dir).pack(
-            side=tk.LEFT, padx=6)
-        ttk.Button(bar, text="清空日志", command=lambda: clear_text(self._log)).pack(
-            side=tk.RIGHT, padx=(6, 0))
-
-        # ── 日志 ──
-        self._log = make_output_text(scroll, height=14)
-        self._log.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
-
-        # 自动填充默认路径
+        # 自动填充默认路径（延迟到 root 可用）
         self.ui.root.after(30, self._autofill)
-        return frame
 
     # ------------------------------------------------------------
     def _autofill(self):
@@ -215,3 +195,12 @@ class PageNoshutdown:
                 os.system(f'xdg-open "{d}" 2>/dev/null || open "{d}"')
         except Exception as e:
             messagebox.showerror("无法打开目录", str(e))
+
+    # ------------------------------------------------------------
+    def buttons(self):
+        return [
+            ("预览 / 状态", self._do_preview),
+            ("执行拦截", self._do_build),
+            ("还原", self._do_restore),
+            ("打开目录", self._open_dir),
+        ]

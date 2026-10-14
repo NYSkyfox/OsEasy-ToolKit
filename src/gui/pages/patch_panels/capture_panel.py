@@ -1,20 +1,18 @@
-# src/gui/pages/page_capture.py
-# 截屏页（页面 3）—— 阻止 / 使用假屏幕截图
+# src/gui/pages/patch_panels/capture_panel.py
+# 阻止 / 使用假屏幕截图 详情面板（VA 型）
 #
 # 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/screen_capture 配置。
 # 配置含 5 个点：4 个 NOP 点（pipeline/bplt/screenrender/wsasend）+ 1 个假截图 shellcode 点。
-#
 # 两种工作模式（对应 GUI 单选）：
 #   nop   —— 勾选要 patch 的 NOP 点（默认 pipeline），传入 labels
 #   fake  —— 用本地 BMP 替换 BitBlt（传 labels=["fake_screen"] + fake_screen=BMP 路径）
-#
-# 输出经 ui.run_with_log 捕获（执行器默认 log=print）。
+# 面板契约：__init__(ui, detail, log_text) —— 把控件 build 进 detail，日志写入 log_text。
 
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from src.gui.widgets import make_scrollable, make_output_text, clear_text
+from src.gui.widgets import clear_text
 from src.core import resolve_target
 from src.core.va_patch import VAPatchExecutor, validate_bmp, convert_bmp_topdown
 from src.modules.patches import get_va_target
@@ -28,23 +26,23 @@ _NOP_DESC = {
 }
 
 
-class PageCapture:
+class CapturePanel:
 
-    def __init__(self, ui):
+    def __init__(self, ui, detail, log_text):
         self.ui = ui
-        self._after_id = None
-        self._nop_vars = {}     # label -> BooleanVar
-
-    def build(self):
-        ui = self.ui
-        frame = ttk.Frame(ui.notebook)
-        self._frame = frame
-        _, scroll = make_scrollable(frame)
+        self._detail = detail
+        self._log = log_text
         self._target = get_va_target("screen_capture")
+        self._nop_vars = {}     # label -> BooleanVar
+        self._build()
+
+    # ------------------------------------------------------------
+    def _build(self):
+        d = self._detail
 
         # ── 目标 DLL ──
-        ff = ttk.LabelFrame(scroll, text="目标文件", padding=8)
-        ff.pack(fill=tk.X, padx=5, pady=3)
+        ff = ttk.LabelFrame(d, text="目标文件", padding=8)
+        ff.pack(fill=tk.X, padx=2, pady=3)
         ff.columnconfigure(1, weight=1)
         self.dll_var = tk.StringVar()
         ttk.Label(ff, text="StudentLogic.dll：").grid(row=0, column=0, sticky=tk.W,
@@ -55,8 +53,8 @@ class PageCapture:
             row=0, column=2, padx=4)
 
         # ── 工作模式 ──
-        mf = ttk.LabelFrame(scroll, text="工作模式", padding=8)
-        mf.pack(fill=tk.X, padx=5, pady=3)
+        mf = ttk.LabelFrame(d, text="工作模式", padding=8)
+        mf.pack(fill=tk.X, padx=2, pady=3)
         self.mode_var = tk.StringVar(value="nop")
         ttk.Radiobutton(mf, text="停止截图发送（教师端画面定格，状态灯在线）",
                         variable=self.mode_var, value="nop").grid(
@@ -66,14 +64,14 @@ class PageCapture:
             row=1, column=0, columnspan=2, sticky=tk.W, padx=4)
 
         # ── NOP 点选择（nop 模式才显示） ──
-        nf = ttk.LabelFrame(scroll, text="NOP 模式 · 选择要 patch 的点", padding=8)
-        self._nop_frame = nf
-        nf.columnconfigure(1, weight=1)
-        self._build_nop_checkboxes(nf)
+        self._nop_frame = ttk.LabelFrame(
+            d, text="NOP 模式 · 选择要 patch 的点", padding=8)
+        self._nop_frame.columnconfigure(1, weight=1)
+        self._build_nop_checkboxes(self._nop_frame)
 
         # ── 假截图 BMP（fake 模式才显示） ──
         self._bmp_frame = ttk.LabelFrame(
-            scroll, text="假截图 BMP（32bpp 无压缩，路径 ≤ %d 字符）" %
+            d, text="假截图 BMP（32bpp 无压缩，路径 ≤ %d 字符）" %
             self._target.shellcode_max_fp, padding=8)
         self._bmp_frame.columnconfigure(1, weight=1)
         self.bmp_var = tk.StringVar()
@@ -87,8 +85,8 @@ class PageCapture:
             row=1, column=0, columnspan=3, sticky=tk.W, padx=4)
 
         # ── 输出选项 ──
-        self._options_frame = ttk.LabelFrame(scroll, text="输出选项", padding=8)
-        self._options_frame.pack(fill=tk.X, padx=5, pady=3)
+        self._options_frame = ttk.LabelFrame(d, text="输出选项", padding=8)
+        self._options_frame.pack(fill=tk.X, padx=2, pady=3)
         self.out_var = tk.StringVar(value="newfile")
         ttk.Radiobutton(self._options_frame, text="生成新文件（不动原文件）",
                         variable=self.out_var, value="newfile").grid(
@@ -99,36 +97,18 @@ class PageCapture:
 
         # mode 两个 frame 都先 pack 到输出选项上方（nop 在 bmp 之上），
         # 再由 _on_mode_changed 按模式切换显示
-        self._bmp_frame.pack(fill=tk.X, padx=5, pady=3,
+        self._bmp_frame.pack(fill=tk.X, padx=2, pady=3,
                              before=self._options_frame)
-        self._nop_frame.pack(fill=tk.X, padx=5, pady=3,
+        self._nop_frame.pack(fill=tk.X, padx=2, pady=3,
                              before=self._options_frame)
 
         # 默认 nop 模式
         self.mode_var.trace_add("write", self._on_mode_changed)
         self._on_mode_changed()
 
-        # ── 按钮 ──
-        bar = ttk.Frame(scroll)
-        bar.pack(fill=tk.X, padx=5, pady=4)
-        ttk.Button(bar, text="预览 (Dry-run)", command=self._do_preview).pack(
-            side=tk.LEFT, padx=(0, 6))
-        ttk.Button(bar, text="应用", command=self._do_apply).pack(
-            side=tk.LEFT, padx=6)
-        ttk.Button(bar, text="还原", command=self._do_restore).pack(
-            side=tk.LEFT, padx=6)
-        ttk.Button(bar, text="清空日志", command=lambda: clear_text(self._log)).pack(
-            side=tk.RIGHT, padx=(6, 0))
-
-        # ── 日志 ──
-        self._log = make_output_text(scroll, height=12)
-        self._log.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
-
         # 自动填充 DLL 路径
         self.ui.root.after(30, self._autofill)
-        return frame
 
-    # ------------------------------------------------------------
     def _build_nop_checkboxes(self, parent):
         """从配置读取所有 NOP 点，构建复选框（默认勾选 pipeline）。"""
         for ft in self._target.files:
@@ -155,13 +135,13 @@ class PageCapture:
         fake = (self.mode_var.get() == "fake")
         if fake:
             if self._bmp_frame.winfo_manager() != "pack":
-                self._bmp_frame.pack(fill=tk.X, padx=5, pady=3,
+                self._bmp_frame.pack(fill=tk.X, padx=2, pady=3,
                                      before=self._options_frame)
             if self._nop_frame.winfo_manager() == "pack":
                 self._nop_frame.pack_forget()
         else:
             if self._nop_frame.winfo_manager() != "pack":
-                self._nop_frame.pack(fill=tk.X, padx=5, pady=3,
+                self._nop_frame.pack(fill=tk.X, padx=2, pady=3,
                                      before=self._options_frame)
             if self._bmp_frame.winfo_manager() == "pack":
                 self._bmp_frame.pack_forget()
@@ -230,7 +210,6 @@ class PageCapture:
         if not dll:
             return
         ex = self._executor(dll)
-
         if self.mode_var.get() == "fake":
             bmp, ok = self._resolve_bmp()
             if not ok:
@@ -294,3 +273,11 @@ class PageCapture:
                              on_done=lambda ok: self.ui.show_status(
                                  ok_msg if ok else fail_msg),
                              label="screen_capture")
+
+    # ------------------------------------------------------------
+    def buttons(self):
+        return [
+            ("预览 (Dry-run)", self._do_preview),
+            ("应用", self._do_apply),
+            ("还原", self._do_restore),
+        ]

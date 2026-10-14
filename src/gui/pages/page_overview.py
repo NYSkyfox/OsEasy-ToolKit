@@ -128,10 +128,16 @@ class PageOverview:
         ttk.Button(bar, text="刷新状态", command=self._refresh).pack(
             side=tk.LEFT, padx=(0, 6))
 
-        navs = [("Patch 管理", 1), ("双开", 2), ("截屏", 3), ("拦截关机", 4)]
-        for text, idx in navs:
+        # 全部 patch 目标现统一在 Patch 页，快捷入口跳转并选中具体目标
+        navs = [
+            ("全部 Patch", None),
+            ("双开", "va:duo_open"),
+            ("截屏", "va:screen_capture"),
+            ("拦截关机", "va:noshutdown"),
+        ]
+        for text, key in navs:
             ttk.Button(bar, text=text,
-                       command=lambda i=idx: self.ui.notebook.select(i)).pack(
+                       command=lambda k=key: self.ui.goto_patch(k)).pack(
                 side=tk.LEFT, padx=3)
 
     # ------------------------------------------------------------

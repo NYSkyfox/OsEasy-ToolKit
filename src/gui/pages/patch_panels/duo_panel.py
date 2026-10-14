@@ -1,48 +1,46 @@
-# src/gui/pages/page_duo.py
-# 双开页（页面 2）—— 双开教师端 / 学生端
+# src/gui/pages/patch_panels/duo_panel.py
+# 双开教师端 / 学生端 详情面板（VA 型）
 #
 # 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/duo_open 配置。
-# duo_open 目标含两个文件（Teacher.exe / Student.exe），各建一个执行器。
-#
-# 输出经 ui.run_with_log 捕获（执行器默认 log=print）。
+# 配置含两个文件（Teacher.exe / Student.exe），各建一个执行器。
+# 面板契约：__init__(ui, detail, log_text) —— 把控件 build 进 detail，日志写入 log_text。
 
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from src.gui.widgets import make_scrollable, make_output_text, clear_text
+from src.gui.widgets import clear_text
 from src.core import resolve_target
 from src.core.va_patch import VAPatchExecutor
 from src.modules.patches import get_va_target
 
 
-class PageDuo:
+class DuoPanel:
 
-    def __init__(self, ui):
+    def __init__(self, ui, detail, log_text):
         self.ui = ui
-        self._after_id = None
+        self._detail = detail
+        self._log = log_text
+        self._target = get_va_target("duo_open")
+        self._build()
 
-    def build(self):
-        ui = self.ui
-        frame = ttk.Frame(ui.notebook)
-        self._frame = frame
-        _, scroll = make_scrollable(frame)
+    # ------------------------------------------------------------
+    def _build(self):
+        d = self._detail
 
         # ── 文件选择 ──
-        ff = ttk.LabelFrame(scroll, text="目标文件", padding=8)
-        ff.pack(fill=tk.X, padx=5, pady=3)
+        ff = ttk.LabelFrame(d, text="目标文件", padding=8)
+        ff.pack(fill=tk.X, padx=2, pady=3)
         ff.columnconfigure(1, weight=1)
-
         self.var_tea = tk.StringVar()
         self.var_stu = tk.StringVar()
         self._file_row(ff, 0, "教师端 Teacher.exe", self.var_tea, "Teacher.exe")
         self._file_row(ff, 1, "学生端 Student.exe", self.var_stu, "Student.exe")
 
         # ── 选项 ──
-        of = ttk.LabelFrame(scroll, text="选项", padding=8)
-        of.pack(fill=tk.X, padx=5, pady=3)
+        of = ttk.LabelFrame(d, text="选项", padding=8)
+        of.pack(fill=tk.X, padx=2, pady=3)
         of.columnconfigure(1, weight=1)
-
         self.mode = tk.StringVar(value="newfile")
         ttk.Radiobutton(of, text="生成新文件  *_duo_open.exe（推荐，不动原文件）",
                         variable=self.mode, value="newfile").grid(
@@ -55,29 +53,9 @@ class PageDuo:
                         variable=self.strict).grid(
             row=2, column=0, columnspan=2, sticky=tk.W, padx=4, pady=(2, 4))
 
-        # ── 按钮 ──
-        bar = ttk.Frame(scroll)
-        bar.pack(fill=tk.X, padx=5, pady=4)
-        ttk.Button(bar, text="预览 (Dry-run)", command=self._do_preview).pack(
-            side=tk.LEFT, padx=(0, 6))
-        ttk.Button(bar, text="生成双开版", command=self._do_build).pack(
-            side=tk.LEFT, padx=6)
-        ttk.Button(bar, text="还原（原地模式）", command=self._do_restore).pack(
-            side=tk.LEFT, padx=6)
-        ttk.Button(bar, text="打开目录", command=self._open_dir).pack(
-            side=tk.LEFT, padx=6)
-        ttk.Button(bar, text="清空日志", command=lambda: clear_text(self._log)).pack(
-            side=tk.RIGHT, padx=(6, 0))
-
-        # ── 日志 ──
-        self._log = make_output_text(scroll, height=14)
-        self._log.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
-
-        # 自动填充默认路径
+        # 自动填充默认路径（延迟到 root 可用）
         self.ui.root.after(30, self._autofill)
-        return frame
 
-    # ------------------------------------------------------------
     def _file_row(self, parent, row, label, var, default_name):
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky=tk.W,
                                            padx=6, pady=4)
@@ -117,13 +95,11 @@ class PageDuo:
         return t, s
 
     def _executors(self):
-        """对 Teacher / Student 各建一个执行器。返回 (tea_ex, stu_ex)。"""
-        target = get_va_target("duo_open")
         t, s = self._paths() or (None, None)
         if not t or not s:
             return None, None
-        return (VAPatchExecutor(target, t, role="teacher"),
-                VAPatchExecutor(target, s, role="student"))
+        return (VAPatchExecutor(self._target, t, role="teacher"),
+                VAPatchExecutor(self._target, s, role="student"))
 
     def _run(self, func, ok_msg, fail_msg):
         clear_text(self._log)
@@ -132,6 +108,7 @@ class PageDuo:
                                  ok_msg if ok else fail_msg),
                              label="duo_open")
 
+    # ------------------------------------------------------------
     def _do_preview(self):
         if not self._paths():
             return
@@ -184,3 +161,12 @@ class PageDuo:
                 os.system(f'xdg-open "{d}" 2>/dev/null || open "{d}"')
         except Exception as e:
             messagebox.showerror("无法打开目录", str(e))
+
+    # ------------------------------------------------------------
+    def buttons(self):
+        return [
+            ("预览 (Dry-run)", self._do_preview),
+            ("生成双开版", self._do_build),
+            ("还原（原地模式）", self._do_restore),
+            ("打开目录", self._open_dir),
+        ]

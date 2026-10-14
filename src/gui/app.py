@@ -3,7 +3,7 @@
 #
 # 结构：
 #   ┌─────────────────────────────────────────┐
-#   │  主页 | Patch | 双开 | 截屏               │  ← 顶部导航（Notebook tab）
+#   │  主页 | Patch                            │  ← 顶部导航（Notebook tab）
 #   ├─────────────────────────────────────────┤
 #   │                                         │
 #   │              当前页面内容区              │  ← 下部内容区
@@ -22,9 +22,7 @@ from tkinter import ttk, messagebox
 from config import APP_VERSION, RELEASE_NAME
 from src.gui.style import apply_theme, disable_widget_focus
 from src.gui.widgets import append_text
-from src.gui.pages import (
-    PageOverview, PagePatches, PageDuo, PageCapture, PageNoshutdown,
-)
+from src.gui.pages import PageOverview, PagePatches
 
 
 class Ui:
@@ -80,11 +78,8 @@ class Ui:
         self._pages = [
             PageOverview(self),
             PagePatches(self),
-            PageDuo(self),
-            PageCapture(self),
-            PageNoshutdown(self),
         ]
-        tab_labels = ["主页", "Patch", "双开", "截屏", "拦截关机"]
+        tab_labels = ["主页", "Patch"]
 
         for page, label in zip(self._pages, tab_labels):
             frame = page.build()
@@ -276,6 +271,18 @@ class Ui:
             if isinstance(page, cls):
                 return page
         return None
+
+    def goto_patch(self, key: str = None) -> None:
+        """跳转并选中 Patch 页的某目标（key 如 'va:duo_open' / 'fixed:multiclient_disable'）。
+
+        供主页快捷入口使用：先切到 Patch tab，再选中目标重建面板。
+        """
+        page = self._get_page(PagePatches)
+        if page is None:
+            return
+        self.notebook.select(page._frame)
+        if key is not None:
+            page.select_key(key)
 
 
 # 全局单例（入口 import 后调用 main()）
