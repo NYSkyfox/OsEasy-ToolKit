@@ -28,7 +28,8 @@ OSEASY_INSTALL_CANDIDATES = [
 ACCENT_COLOR = "#3B8A67"
 
 # ── 各功能的人类可读描述（用于 GUI 概览 / tooltip） ────────
-# 说明：3 个 VA 型功能在此登记（overview「功能模块」区显示）。
+# 说明：3 个 VA 型功能 + 1 个教师端授权解除（dog_license）在此登记
+# （overview「功能模块」区显示）。
 # 3 个固定偏移目标（行为管控 / 屏幕广播 / 窗口化）由 overview「Patch 目标状态」
 # 区直接遍历 src/patches 注册表展示，不在此重复。
 FEATURE_DESC = {
@@ -46,5 +47,10 @@ FEATURE_DESC = {
         "拦截远程关机 / 重启",
         "patch Student.exe 的 FUN_004a9660 入口，使教师端下发的 远程重启 / 远程关机 "
         "指令在学生机失效。一个点封两个动作，支持文件版（持久）与内存版（抗 ASLR）。",
+    ),
+    "dog_license": (
+        "教师端 加密狗 / 点数限制 解除",
+        "教师端授权解除组合工具（4 方案可多选）：解除学生机连接数上限[MainLogic.dll]、"
+        "恒判有狗[Teacher.exe]、消除\"未找到加密狗\"弹窗[Teacher.exe]、改 core.conf /Limit/ 并重签。",
     ),
 }

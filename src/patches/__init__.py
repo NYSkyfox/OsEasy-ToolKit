@@ -55,3 +55,11 @@ def get_va_target(key: str):
 
 def va_target_keys() -> list:
     return list(_VA_TARGET_MAP.keys())
+
+
+# ── 教师端「加密狗 / 点数限制」解除（DogPatchExecutor 驱动） ──
+# 4 个方案组合工具（anchor / multi / va / config 四种定位），共享安装目录，
+# 面板为「目录 + 方案勾选 + 批量操作」，故单独注册，不并入上面两组。
+from src.patches.dog_license import (
+    DOG_SOLUTIONS, get_dog_solution, dog_solution_keys,
+)

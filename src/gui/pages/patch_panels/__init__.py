@@ -24,6 +24,8 @@ from src.gui.pages.patch_panels.screenrender_windowed import ScreenrenderWindowe
 from src.gui.pages.patch_panels.teacher_student_double_open import TeacherStudentDoubleOpen
 from src.gui.pages.patch_panels.student_fake_screenshot import StudentFakeScreenshot
 from src.gui.pages.patch_panels.fake_shutdown import FakeShutdown
+from src.gui.pages.patch_panels.dog_license import DogLicense
+from src.patches import DOG_SOLUTIONS
 
 REGISTRY = [
     {
@@ -67,6 +69,13 @@ REGISTRY = [
         "kind": "va",
         "target": get_va_target("noshutdown"),
         "factory": lambda ui, d, lg: FakeShutdown(ui, d, lg),
+    },
+    {
+        "id": "dog_license",
+        "label": "教师端 加密狗 / 点数限制 解除",
+        "kind": "dog",
+        "target": DOG_SOLUTIONS,
+        "factory": lambda ui, d, lg: DogLicense(ui, d, lg),
     },
 ]
 

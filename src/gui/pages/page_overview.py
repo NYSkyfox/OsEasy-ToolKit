@@ -132,6 +132,7 @@ class PageOverview:
             ("双开", "teacher_student_double_open"),
             ("截屏", "student_fake_screenshot"),
             ("拦截关机", "fake_shutdown"),
+            ("授权解除", "dog_license"),
         ]
         for text, key in navs:
             ttk.Button(bar, text=text,
