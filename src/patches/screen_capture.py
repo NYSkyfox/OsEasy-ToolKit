@@ -1,4 +1,4 @@
-# src/modules/patches/screen_capture.py
+# src/patches/screen_capture.py
 # 阻止 / 使用假屏幕截图 —— 纯 patch 点配置（无执行逻辑）
 #
 # 目标 StudentLogic.dll（PE32，ImageBase=0x10000000）

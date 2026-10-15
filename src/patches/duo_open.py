@@ -1,4 +1,4 @@
-# src/modules/patches/duo_open.py
+# src/patches/duo_open.py
 # 双开教师端 / 学生端 —— 纯 patch 点配置（无执行逻辑）
 #
 # 逆向结论：

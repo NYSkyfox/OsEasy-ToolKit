@@ -1,4 +1,4 @@
-# src/modules/patches/noshutdown.py
+# src/patches/noshutdown.py
 # 拦截远程关机 / 重启 —— 纯 patch 点配置（无执行逻辑）
 #
 # 目标 Student.exe（PE32，i386，ImageBase=0x400000）

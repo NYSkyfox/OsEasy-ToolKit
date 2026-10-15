@@ -1,6 +1,6 @@
 # src/gui/pages/patch_panels/student_fake_screenshot.py
 # 「阻止 / 使用假屏幕截图」面板 —— VA 型 patch
-# 驱动 src/core/va_patch.VAPatchExecutor + src/modules/patches/screen_capture 配置。
+# 驱动 src/core/va_patch.VAPatchExecutor + src/patches/screen_capture 配置。
 # 配置含 5 个点：4 个 NOP 点（pipeline/bplt/screenrender/wsasend）+ 1 个假截图 shellcode 点。
 # 两种工作模式（对应 GUI 单选）：
 #   nop   —— 勾选要 patch 的 NOP 点（默认 pipeline），传入 labels
@@ -14,7 +14,7 @@ from tkinter import ttk, filedialog, messagebox
 from src.gui.widgets import clear_text
 from src.core import resolve_target
 from src.core.va_patch import VAPatchExecutor, validate_bmp, convert_bmp_topdown
-from src.modules.patches import get_va_target
+from src.patches import get_va_target
 
 # NOP 点标签的中文说明（用于复选框显示）
 _NOP_DESC = {

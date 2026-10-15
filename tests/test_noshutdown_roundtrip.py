@@ -6,7 +6,7 @@ tests/test_noshutdown_roundtrip.py
 noshutdown 文件版往返测试（纯逻辑，跨平台，无需真实样本 / 无第三方依赖）。
 
 重构后：执行逻辑统一在 src/core/va_patch.VAPatchExecutor，
-patch 点配置在 src/modules/patches/noshutdown.py（纯数据）。
+patch 点配置在 src/patches/noshutdown.py（纯数据）。
 
 构造一个最小但合法的 PE32 伪样本：
   - 单 .text 节，RVA 0x1000 .. 0x101000，rawptr=0x1000（rawptr 对齐）
@@ -31,7 +31,7 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from src.core.va_patch import VAPatchExecutor
-from src.modules.patches import get_va_target
+from src.patches import get_va_target
 
 PASS = 0
 FAIL = 0

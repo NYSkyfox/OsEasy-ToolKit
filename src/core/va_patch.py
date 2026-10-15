@@ -13,7 +13,7 @@
 #   - 支持内存版（运行时写进程内存）
 #   - 支持 mode 标签（同一文件的不同 patch 模式，如 screen_capture 的 nop/fake）
 #
-# 配置来源：src/modules/patches/*.py（纯数据，无执行逻辑）
+# 配置来源：src/patches/*.py（纯数据，无执行逻辑）
 
 import os
 import struct

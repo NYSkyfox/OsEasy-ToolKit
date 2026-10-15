@@ -41,16 +41,14 @@ OsEasy-ManagerHelper/
 │   │   ├── patch_engine.py  #     固定偏移型引擎（PatchTarget/PatchEngine）
 │   │   └── va_patch.py      #     VA 型统一执行器（PE 解析 / shellcode / 内存版 / BMP）
 │   │
-│   ├── patches/             # ── 固定偏移 patch（注册表驱动，引擎型） ──
-│   │   ├── multiclient_disable_behaviorcontrol.py  # 禁用行为管控
-│   │   ├── multiclient_disable_screenrender.py     # 禁用屏幕广播（含可选键鼠锁）
-│   │   └── screenrender_windowed.py                # 屏幕广播窗口化
-│   │
-│   ├── modules/             # ── VA 型 patch：纯配置（无执行逻辑） ──
-│   │   └── patches/           #   每个文件一个 VA_PatchTarget（patch 点数据）
-│   │       ├── duo_open.py            # 双开教师端/学生端
-│   │       ├── screen_capture.py      # 阻止/使用假屏幕截图（nop + 假截图）
-│   │       └── noshutdown.py          # 拦截远程关机/重启（文件版+内存版）
+│   ├── patches/             # ── 全部 patch 目标：纯配置（无执行逻辑） ──
+│   │   ├── __init__.py          #   注册表：ALL_TARGETS(固定偏移) + VA_TARGETS(VA型)
+│   │   ├── multiclient_disable_behaviorcontrol.py  # 禁用行为管控（固定偏移）
+│   │   ├── multiclient_disable_screenrender.py     # 禁用屏幕广播·含可选键鼠锁（固定偏移）
+│   │   ├── screenrender_windowed.py                # 屏幕广播窗口化（固定偏移）
+│   │   ├── duo_open.py                 # 双开教师端/学生端（VA）
+│   │   ├── screen_capture.py           # 阻止/假截图·nop+shellcode（VA）
+│   │   └── noshutdown.py               # 拦截关机/重启·文件+内存版（VA）
 │   │
 │   └── gui/                 # ── 界面层 ──
 │       ├── app.py           #     主框架（顶部导航 + 内容区 + 状态栏）
@@ -76,9 +74,11 @@ OsEasy-ManagerHelper/
 - **core**：纯逻辑，零 UI 依赖。两套执行引擎：
   - `patch_engine`（固定偏移型）：`PatchTarget` + `PatchEngine`，GUI/CLI 共用。
   - `va_patch`（VA 型统一执行器）：`VAPatchExecutor`，含 PE 解析 / VA→偏移 / shellcode 生成 / 内存版 / BMP 处理，是**唯一**执行 VA 型 patch 的入口。
-- **patches**：固定偏移 patch 目标（引擎型），每个文件定义一个 `PatchTarget` 并注册到 `__init__.ALL_TARGETS`；新增工具 = 加一个文件 + 一行注册，GUI 自动发现。
-- **modules/patches**：VA 型 patch 的**纯配置**（每个文件一个 `VA_PatchTarget`，仅 patch 点数据，无执行逻辑），由 `va_patch.VAPatchExecutor` 读取后执行；新增工具 = 加一个配置 + 一行注册。
-- **gui**：只负责展示与交互，调用 core 执行器 + 读取 patches/modules 配置，不含业务逻辑。所有 patch 目标统一在 **Patch 页**（目标下拉 → 动态重建详情面板 → 共享日志），**一个下拉项 = 一个面板文件**（`patch_panels/<id>.py`，类名 = id 的 PascalCase）；新增目标 = 建一个面板文件 + 在 `patch_panels/__init__.REGISTRY` 登记一条，下拉框自动出现。
+- **patches**：全部 patch 目标的**纯配置**（无执行逻辑），平级存放，按驱动引擎分两组注册于 `__init__.py`：
+  - 固定偏移型：每个文件一个 `PatchTarget` → `ALL_TARGETS`，由 `patch_engine.PatchEngine` 执行。
+  - VA 型：每个文件一个 `VA_PatchTarget` → `VA_TARGETS`，由 `va_patch.VAPatchExecutor` 执行。
+  新增工具 = 加一个配置文件 + 一行注册（按机制选 `ALL_TARGETS` 或 `VA_TARGETS`），GUI 自动发现。
+- **gui**：只负责展示与交互，调用 core 执行器 + 读取 patches 配置，不含业务逻辑。所有 patch 目标统一在 **Patch 页**（目标下拉 → 动态重建详情面板 → 共享日志），**一个下拉项 = 一个面板文件**（`patch_panels/<id>.py`，类名 = id 的 PascalCase）；新增目标 = 建一个面板文件 + 在 `patch_panels/__init__.REGISTRY` 登记一条，下拉框自动出现。
 
 ## 安全说明
 

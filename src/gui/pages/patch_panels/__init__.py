@@ -13,10 +13,10 @@
 #
 # 新增 patch 目标：建一个面板文件 + 在此登记一条，下拉框自动出现，无需改框架。
 #   - 固定偏移型：面板驱动 src/patches/<key>.py 的 PatchTarget
-#   - VA 型     ：面板驱动 src/modules/patches/<key>.py 的 VA_PatchTarget
+#   - VA 型     ：面板驱动 src/patches/<key>.py 的 VA_PatchTarget
 
 from src.patches import get_target
-from src.modules.patches import get_va_target
+from src.patches import get_va_target
 
 from src.gui.pages.patch_panels.multiclient_disable_behaviorcontrol import MulticlientDisableBehaviorcontrol
 from src.gui.pages.patch_panels.multiclient_disable_screenrender import MulticlientDisableScreenrender

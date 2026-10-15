@@ -50,6 +50,6 @@ FUN_004a9660:
 
 ## 落位
 
-`src/modules/noshutdown.py`（PE+VA 定位 + 内存版，与 `duo_open` 同类，独立维护；
+`src/patches/noshutdown.py`（PE+VA 定位 + 内存版，与 `duo_open` 同类，独立维护；
 不纳入 `src/patches/` 注册表，因后者只收固定文件偏移的纯引擎目标）。
 GUI 页面 `src/gui/pages/page_noshutdown.py`。
